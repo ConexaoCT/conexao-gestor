@@ -5,8 +5,10 @@ import { useMemo, useState } from 'react';
 type UserRole = 'teacher' | 'reception' | 'admin';
 type ClassStatus = 'open' | 'upcoming' | 'closed';
 type Sport = 'Beach Tennis' | 'Futevôlei';
+type LoginTab = 'teachers' | 'reception' | 'admin';
 type TeacherTab = 'today' | 'space';
-type OpsTab = 'folder' | 'leads' | 'financial';
+type ReceptionTab = 'classes' | 'registrations';
+type AdminTab = 'classes' | 'registrations' | 'financial';
 
 type User = {
   id: string;
@@ -39,16 +41,16 @@ type ClassItem = {
   students: Student[];
 };
 
-type Lead = {
+type ExperimentalLead = {
   id: string;
   name: string;
   phone: string;
   modality: Sport;
-  type: 'Experimental' | 'Avulsa';
   category: string;
   teacher: string;
   scheduledDate: string;
   scheduledTime: string;
+  notes?: string;
 };
 
 type FinancialRow = {
@@ -201,28 +203,28 @@ const initialClasses: ClassItem[] = [
   },
 ];
 
-const initialLeads: Lead[] = [
+const initialExperimentals: ExperimentalLead[] = [
   {
     id: 'lead-1',
     name: 'Patrícia Lima',
     phone: '(34) 99999-1001',
     modality: 'Beach Tennis',
-    type: 'Experimental',
     category: 'Iniciante 1',
     teacher: 'Hugo Leonardo',
     scheduledDate: '24/03/2026',
     scheduledTime: '18:00',
+    notes: 'Entrou em contato pelo Instagram',
   },
   {
     id: 'lead-2',
     name: 'Thiago Lopes',
     phone: '(34) 99999-1002',
     modality: 'Futevôlei',
-    type: 'Avulsa',
     category: 'Intermediário',
     teacher: 'João José',
     scheduledDate: '25/03/2026',
     scheduledTime: '19:00',
+    notes: 'Quer testar turma da noite',
   },
 ];
 
@@ -318,26 +320,35 @@ function studentTagStyle(tag?: Student['tag']): React.CSSProperties {
   if (tag === 'Experimental') return { ...base, background: COLORS.greenSoft, color: COLORS.green };
   if (tag === 'Avulsa') return { ...base, background: COLORS.blueSoft, color: COLORS.blue };
   if (tag === 'Reposição') return { ...base, background: '#FEF3C7', color: '#92400E' };
+  if (tag === 'Extra') return { ...base, background: '#F3E8FF', color: '#7C3AED' };
   return { ...base, background: '#F8FAFC', color: COLORS.muted, border: `1px solid ${COLORS.border}` };
 }
 
 export default function Home() {
-  const [screen, setScreen] = useState<'login' | 'teacher' | 'ops'>('login');
-  const [selectedUserId, setSelectedUserId] = useState('t1');
+  const [screen, setScreen] = useState<'login' | 'teacher' | 'reception' | 'admin'>('login');
+  const [loginTab, setLoginTab] = useState<LoginTab>('teachers');
+  const [selectedTeacherIdForLogin, setSelectedTeacherIdForLogin] = useState('t1');
+  const [selectedRoleUserId, setSelectedRoleUserId] = useState('r1');
   const [selectedTeacherFolderId, setSelectedTeacherFolderId] = useState('t1');
   const [teacherTab, setTeacherTab] = useState<TeacherTab>('today');
-  const [opsTab, setOpsTab] = useState<OpsTab>('folder');
+  const [receptionTab, setReceptionTab] = useState<ReceptionTab>('classes');
+  const [adminTab, setAdminTab] = useState<AdminTab>('classes');
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [classSearch, setClassSearch] = useState('');
   const [classes, setClasses] = useState<ClassItem[]>(initialClasses);
-  const [leads] = useState(initialLeads);
+  const [experimentals] = useState(initialExperimentals);
   const [financialByMonth, setFinancialByMonth] = useState(initialFinancialByMonth);
   const [selectedMonth, setSelectedMonth] = useState('MARÇO');
 
-  const selectedUser = users.find((u) => u.id === selectedUserId) || users[0];
+  const currentLoginUser =
+    loginTab === 'teachers'
+      ? users.find((u) => u.id === selectedTeacherIdForLogin) || users[0]
+      : users.find((u) => u.id === selectedRoleUserId) || users[0];
+
+  const currentUser = currentLoginUser;
   const selectedTeacher = users.find((u) => u.id === selectedTeacherFolderId) || teacherFolders[0];
-  const teacherClasses = classes.filter((item) => item.teacherId === selectedUser.id);
+  const teacherClasses = classes.filter((item) => item.teacherId === currentUser.id);
   const folderClasses = classes.filter((item) => item.teacherId === selectedTeacherFolderId);
   const groupedFolderClasses = groupByDay(folderClasses);
   const teacherHasOpenClass = teacherClasses.some((item) => item.status === 'open');
@@ -359,14 +370,22 @@ export default function Home() {
     return Array.from(unique.values());
   }, [teacherClasses]);
 
+  const teacherFinancialMirror = useMemo(() => {
+    return monthRows
+      .filter((row) => row.teacher === currentUser.name)
+      .map((row) => {
+        const received = parseMoney(row.received);
+        const rate = teacherRates[row.teacher] || 0;
+        return {
+          ...row,
+          teacherValue: received * rate,
+        };
+      });
+  }, [monthRows, currentUser.name]);
+
   const teacherMonthlyValue = useMemo(() => {
-    return monthRows.reduce((acc, row) => {
-      if (row.teacher !== selectedUser.name) return acc;
-      const received = parseMoney(row.received);
-      const rate = teacherRates[row.teacher] || 0;
-      return acc + received * rate;
-    }, 0);
-  }, [monthRows, selectedUser.name]);
+    return teacherFinancialMirror.reduce((acc, row) => acc + row.teacherValue, 0);
+  }, [teacherFinancialMirror]);
 
   const financialSummary = useMemo(() => {
     return monthRows.reduce(
@@ -381,23 +400,42 @@ export default function Home() {
     );
   }, [monthRows]);
 
+  const sharedStudentsForSelectedTeacher = useMemo(() => {
+    const map = new Map<string, Student & { turma: string; horario: string; quadra: string }>();
+    folderClasses.forEach((item) => {
+      item.students.forEach((student) => {
+        if (!map.has(student.id)) {
+          map.set(student.id, {
+            ...student,
+            turma: item.category,
+            horario: `${item.day} ${item.time}`,
+            quadra: item.court || 'A definir',
+          });
+        }
+      });
+    });
+    return Array.from(map.values());
+  }, [folderClasses]);
+
   const metrics = useMemo(() => {
     const openClasses = classes.filter((item) => item.status === 'open').length;
     const overdue = monthRows.filter((row) => row.notReceived.trim() !== '').length;
     return {
       openClasses: `${openClasses}/${classes.length}`,
-      leads: String(leads.length),
+      experimentals: String(experimentals.length),
       overdue: String(overdue),
       teacherTotal: formatCurrency(financialSummary.teacher),
       arenaTotal: formatCurrency(financialSummary.arena),
     };
-  }, [classes, leads.length, monthRows, financialSummary.teacher, financialSummary.arena]);
+  }, [classes, experimentals.length, monthRows, financialSummary.teacher, financialSummary.arena]);
 
   function handleLogin() {
-    if (pin === selectedUser.pin) {
+    if (pin === currentLoginUser.pin) {
       setPin('');
       setPinError('');
-      setScreen(selectedUser.role === 'teacher' ? 'teacher' : 'ops');
+      if (currentLoginUser.role === 'teacher') setScreen('teacher');
+      if (currentLoginUser.role === 'reception') setScreen('reception');
+      if (currentLoginUser.role === 'admin') setScreen('admin');
       return;
     }
     setPinError('PIN inválido.');
@@ -526,14 +564,14 @@ export default function Home() {
                 fontWeight: 700,
               }}
             >
-              {selectedUser.initials}
+              {currentUser.initials}
             </div>
             <div>
-              <div style={{ fontWeight: 700, color: COLORS.blue }}>{selectedUser.name}</div>
+              <div style={{ fontWeight: 700, color: COLORS.blue }}>{currentUser.name}</div>
               <div style={{ fontSize: 12, color: COLORS.muted }}>
-                {selectedUser.role === 'teacher'
+                {currentUser.role === 'teacher'
                   ? 'Professor'
-                  : selectedUser.role === 'reception'
+                  : currentUser.role === 'reception'
                     ? 'Recepção'
                     : 'Administração'}
               </div>
@@ -559,6 +597,10 @@ export default function Home() {
   }
 
   if (screen === 'login') {
+    const teacherUsers = users.filter((u) => u.role === 'teacher');
+    const receptionUsers = users.filter((u) => u.role === 'reception');
+    const adminUsers = users.filter((u) => u.role === 'admin');
+
     return (
       <main
         style={{
@@ -606,15 +648,15 @@ export default function Home() {
               </div>
               <h1 style={{ fontSize: 48, margin: '20px 0 16px' }}>Operação diária do CT em um só lugar</h1>
               <p style={{ margin: 0, color: 'rgba(255,255,255,0.82)', fontSize: 18 }}>
-                Login por PIN, professores organizados por pasta, turmas por dia e financeiro no modelo que vocês já usam.
+                Professores, recepção e administração com acessos separados por PIN.
               </p>
             </div>
 
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16 }}>
               {[
-                ['Acesso por PIN', 'Todos os usuários entram com PIN individual de 4 dígitos.'],
-                ['Professor no tablet', 'Abrir turma, presença com 1 clique e visão da própria carteira.'],
-                ['Recepção ao vivo', 'Turmas, leads e financeiro em uma visão única.'],
+                ['Professores', 'Turmas de hoje, presença com 1 clique e visão da própria carteira.'],
+                ['Recepção', 'Turmas, cadastros, alunos e controle de experimentais.'],
+                ['Admin', 'Visão completa com financeiro e gestão geral.'],
               ].map(([title, text]) => (
                 <div
                   key={title}
@@ -641,38 +683,100 @@ export default function Home() {
                 Entrar no Gestor Conexão
               </h2>
               <p style={{ margin: 0, color: COLORS.muted }}>
-                Selecione o usuário e entre com o PIN para acessar a área correspondente.
+                Escolha a área, selecione o usuário e entre com o PIN.
               </p>
             </div>
 
+            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 18 }}>
+              <button onClick={() => setLoginTab('teachers')} style={tabButton(loginTab === 'teachers')}>
+                PROFESSORES
+              </button>
+              <button
+                onClick={() => {
+                  setLoginTab('reception');
+                  setSelectedRoleUserId('r1');
+                }}
+                style={tabButton(loginTab === 'reception')}
+              >
+                RECEPÇÃO
+              </button>
+              <button
+                onClick={() => {
+                  setLoginTab('admin');
+                  setSelectedRoleUserId('a1');
+                }}
+                style={tabButton(loginTab === 'admin')}
+              >
+                ADMIN
+              </button>
+            </div>
+
             <div style={{ display: 'grid', gap: 12, maxHeight: 320, overflow: 'auto', marginBottom: 20 }}>
-              {users.map((user) => {
-                const active = user.id === selectedUserId;
-                return (
-                  <button
-                    key={user.id}
-                    onClick={() => setSelectedUserId(user.id)}
-                    style={{
-                      textAlign: 'left',
-                      padding: 16,
-                      borderRadius: 24,
-                      border: `1px solid ${active ? COLORS.blue : COLORS.border}`,
-                      background: active ? COLORS.blue : '#fff',
-                      color: active ? '#fff' : COLORS.text,
-                      cursor: 'pointer',
-                    }}
-                  >
-                    <div style={{ fontWeight: 700 }}>{user.name}</div>
-                    <div style={{ fontSize: 13, opacity: 0.85 }}>
-                      {user.role === 'teacher'
-                        ? 'Professor'
-                        : user.role === 'reception'
-                          ? 'Recepção'
-                          : 'Administração'}
-                    </div>
-                  </button>
-                );
-              })}
+              {loginTab === 'teachers'
+                ? teacherUsers.map((user) => {
+                    const active = user.id === selectedTeacherIdForLogin;
+                    return (
+                      <button
+                        key={user.id}
+                        onClick={() => setSelectedTeacherIdForLogin(user.id)}
+                        style={{
+                          textAlign: 'left',
+                          padding: 16,
+                          borderRadius: 24,
+                          border: `1px solid ${active ? COLORS.blue : COLORS.border}`,
+                          background: active ? COLORS.blue : '#fff',
+                          color: active ? '#fff' : COLORS.text,
+                          cursor: 'pointer',
+                        }}
+                      >
+                        <div style={{ fontWeight: 700 }}>{user.name}</div>
+                        <div style={{ fontSize: 13, opacity: 0.85 }}>Professor</div>
+                      </button>
+                    );
+                  })
+                : loginTab === 'reception'
+                  ? receptionUsers.map((user) => {
+                      const active = user.id === selectedRoleUserId;
+                      return (
+                        <button
+                          key={user.id}
+                          onClick={() => setSelectedRoleUserId(user.id)}
+                          style={{
+                            textAlign: 'left',
+                            padding: 16,
+                            borderRadius: 24,
+                            border: `1px solid ${active ? COLORS.blue : COLORS.border}`,
+                            background: active ? COLORS.blue : '#fff',
+                            color: active ? '#fff' : COLORS.text,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <div style={{ fontWeight: 700 }}>{user.name}</div>
+                          <div style={{ fontSize: 13, opacity: 0.85 }}>Recepção</div>
+                        </button>
+                      );
+                    })
+                  : adminUsers.map((user) => {
+                      const active = user.id === selectedRoleUserId;
+                      return (
+                        <button
+                          key={user.id}
+                          onClick={() => setSelectedRoleUserId(user.id)}
+                          style={{
+                            textAlign: 'left',
+                            padding: 16,
+                            borderRadius: 24,
+                            border: `1px solid ${active ? COLORS.blue : COLORS.border}`,
+                            background: active ? COLORS.blue : '#fff',
+                            color: active ? '#fff' : COLORS.text,
+                            cursor: 'pointer',
+                          }}
+                        >
+                          <div style={{ fontWeight: 700 }}>{user.name}</div>
+                          <div style={{ fontSize: 13, opacity: 0.85 }}>Administração</div>
+                        </button>
+                      );
+                    })}
             </div>
 
             <div style={{ marginBottom: 12, fontWeight: 700, fontSize: 14 }}>PIN de acesso</div>
@@ -773,18 +877,6 @@ export default function Home() {
                           <span
                             style={{
                               borderRadius: 999,
-                              background: COLORS.blueSoft,
-                              color: COLORS.blue,
-                              padding: '6px 12px',
-                              fontSize: 13,
-                              fontWeight: 700,
-                            }}
-                          >
-                            {item.sport}
-                          </span>
-                          <span
-                            style={{
-                              borderRadius: 999,
                               background: COLORS.greenSoft,
                               color: COLORS.green,
                               padding: '6px 12px',
@@ -794,25 +886,10 @@ export default function Home() {
                           >
                             {item.day}
                           </span>
-                          <span
-                            style={{
-                              borderRadius: 999,
-                              border: `1px solid ${COLORS.border}`,
-                              padding: '6px 12px',
-                              fontSize: 13,
-                              fontWeight: 700,
-                            }}
-                          >
-                            {item.status === 'open'
-                              ? 'Turma aberta'
-                              : item.status === 'closed'
-                                ? 'Encerrada'
-                                : 'Próxima turma'}
-                          </span>
                         </div>
 
                         <h2 style={{ margin: 0, color: COLORS.blue, fontSize: 28 }}>
-                          {item.teacherName} · {item.time}
+                          {item.time}
                         </h2>
                         <p style={{ margin: '10px 0 0', color: COLORS.muted }}>
                           Categoria: {item.category} · {item.court || 'Quadra a definir'} · {item.students.length}/{item.limit}
@@ -999,11 +1076,9 @@ export default function Home() {
                       <tr style={{ borderBottom: `1px solid ${COLORS.border}`, textAlign: 'left' }}>
                         <th style={{ padding: '12px 8px' }}>Dia</th>
                         <th style={{ padding: '12px 8px' }}>Horário</th>
-                        <th style={{ padding: '12px 8px' }}>Modalidade</th>
                         <th style={{ padding: '12px 8px' }}>Categoria</th>
                         <th style={{ padding: '12px 8px' }}>Quadra</th>
-                        <th style={{ padding: '12px 8px' }}>Alunos</th>
-                        <th style={{ padding: '12px 8px' }}>Status</th>
+                        <th style={{ padding: '12px 8px' }}>Alunos da turma</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1011,26 +1086,10 @@ export default function Home() {
                         <tr key={item.id} style={{ borderBottom: `1px solid #F1F5F9` }}>
                           <td style={{ padding: '12px 8px' }}>{item.day}</td>
                           <td style={{ padding: '12px 8px', fontWeight: 700 }}>{item.time}</td>
-                          <td style={{ padding: '12px 8px' }}>{item.sport}</td>
                           <td style={{ padding: '12px 8px' }}>{item.category}</td>
                           <td style={{ padding: '12px 8px' }}>{item.court || 'A definir'}</td>
-                          <td style={{ padding: '12px 8px' }}>{item.students.length}</td>
                           <td style={{ padding: '12px 8px' }}>
-                            <span
-                              style={{
-                                borderRadius: 999,
-                                border: `1px solid ${COLORS.border}`,
-                                padding: '6px 10px',
-                                fontSize: 12,
-                                fontWeight: 700,
-                              }}
-                            >
-                              {item.status === 'open'
-                                ? 'Turma aberta'
-                                : item.status === 'closed'
-                                  ? 'Encerrada'
-                                  : 'Próxima turma'}
-                            </span>
+                            {item.students.length > 0 ? item.students.map((s) => s.name).join(', ') : 'Sem alunos'}
                           </td>
                         </tr>
                       ))}
@@ -1041,68 +1100,293 @@ export default function Home() {
 
               <div style={cardStyle()}>
                 <div style={{ padding: 20, borderBottom: `1px solid ${COLORS.border}`, fontWeight: 700, color: COLORS.blue }}>
-                  Minha lista de alunos
+                  Minha lista de alunos · espelho do financeiro
                 </div>
                 <div style={{ overflowX: 'auto', padding: 20 }}>
                   <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${COLORS.border}`, textAlign: 'left' }}>
                         <th style={{ padding: '12px 8px' }}>Aluno</th>
-                        <th style={{ padding: '12px 8px' }}>Turma</th>
-                        <th style={{ padding: '12px 8px' }}>Horário</th>
-                        <th style={{ padding: '12px 8px' }}>Status</th>
-                        <th style={{ padding: '12px 8px' }}>Marcador</th>
+                        <th style={{ padding: '12px 8px' }}>Não recebido</th>
+                        <th style={{ padding: '12px 8px' }}>Recebido</th>
+                        <th style={{ padding: '12px 8px' }}>Forma de pagamento</th>
+                        <th style={{ padding: '12px 8px' }}>Meu valor</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {teacherStudents.length > 0 ? (
-                        teacherStudents.map((student) => (
-                          <tr key={student.id} style={{ borderBottom: `1px solid #F1F5F9` }}>
-                            <td style={{ padding: '12px 8px', fontWeight: 700 }}>{student.name}</td>
-                            <td style={{ padding: '12px 8px' }}>{student.turma}</td>
-                            <td style={{ padding: '12px 8px' }}>{student.horario}</td>
-                            <td style={{ padding: '12px 8px' }}>
-                              {student.status === 'inadimplente' ? (
-                                <span
-                                  style={{
-                                    borderRadius: 999,
-                                    background: COLORS.redSoft,
-                                    color: COLORS.red,
-                                    padding: '4px 8px',
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                  }}
-                                >
-                                  Inadimplente
-                                </span>
-                              ) : (
-                                <span
-                                  style={{
-                                    borderRadius: 999,
-                                    background: '#F8FAFC',
-                                    color: COLORS.muted,
-                                    padding: '4px 8px',
-                                    fontSize: 12,
-                                    fontWeight: 700,
-                                    border: `1px solid ${COLORS.border}`,
-                                  }}
-                                >
-                                  Ativo
-                                </span>
-                              )}
-                            </td>
-                            <td style={{ padding: '12px 8px' }}>
-                              <span style={studentTagStyle(student.tag)}>{student.tag || 'Fixo'}</span>
+                      {teacherFinancialMirror.length > 0 ? (
+                        teacherFinancialMirror.map((row) => (
+                          <tr key={row.id} style={{ borderBottom: `1px solid #F1F5F9` }}>
+                            <td style={{ padding: '12px 8px', fontWeight: 700 }}>{row.student}</td>
+                            <td style={{ padding: '12px 8px' }}>{row.notReceived || '-'}</td>
+                            <td style={{ padding: '12px 8px' }}>{row.received || '-'}</td>
+                            <td style={{ padding: '12px 8px' }}>{row.paymentMethod || '-'}</td>
+                            <td style={{ padding: '12px 8px', color: COLORS.blue, fontWeight: 700 }}>
+                              {formatCurrency(row.teacherValue)}
                             </td>
                           </tr>
                         ))
                       ) : (
                         <tr>
                           <td colSpan={5} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
-                            Aguardando importação dos alunos.
+                            Sem lançamentos para este professor neste mês.
                           </td>
                         </tr>
                       )}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </>
+          )}
+        </div>
+      </main>
+    );
+  }
+
+  if (screen === 'reception') {
+    return (
+      <main style={{ minHeight: '100vh', background: COLORS.bg, padding: 24, fontFamily: 'Arial, sans-serif' }}>
+        <div style={{ maxWidth: 1280, margin: '0 auto', display: 'grid', gap: 24 }}>
+          {renderHeader(
+            'Painel da recepção',
+            'Turmas, alunos e cadastros, sem acesso ao financeiro.',
+            'Gestor Conexão · Recepção'
+          )}
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 16 }}>
+            <div style={{ ...cardStyle(), padding: 20 }}>
+              <div style={{ color: COLORS.muted, fontSize: 14 }}>Turmas abertas</div>
+              <div style={{ color: COLORS.blue, fontWeight: 800, fontSize: 30, marginTop: 6 }}>{metrics.openClasses}</div>
+            </div>
+            <div style={{ ...cardStyle(), padding: 20 }}>
+              <div style={{ color: COLORS.muted, fontSize: 14 }}>Experimentais cadastrados</div>
+              <div style={{ color: COLORS.blue, fontWeight: 800, fontSize: 30, marginTop: 6 }}>{metrics.experimentals}</div>
+            </div>
+            <div style={{ ...cardStyle(), padding: 20 }}>
+              <div style={{ color: COLORS.muted, fontSize: 14 }}>Professores</div>
+              <div style={{ color: COLORS.blue, fontWeight: 800, fontSize: 30, marginTop: 6 }}>{teacherFolders.length}</div>
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+            <button onClick={() => setReceptionTab('classes')} style={tabButton(receptionTab === 'classes')}>
+              Turmas e alunos
+            </button>
+            <button onClick={() => setReceptionTab('registrations')} style={tabButton(receptionTab === 'registrations')}>
+              Cadastros
+            </button>
+          </div>
+
+          {receptionTab === 'classes' ? (
+            <>
+              <div>
+                <div style={{ marginBottom: 10, color: COLORS.muted, fontWeight: 700 }}>Professores</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0, 1fr))', gap: 16 }}>
+                  {teacherFolders.map((teacher) => {
+                    const active = teacher.id === selectedTeacherFolderId;
+                    return (
+                      <button
+                        key={teacher.id}
+                        onClick={() => setSelectedTeacherFolderId(teacher.id)}
+                        style={{
+                          ...cardStyle(),
+                          padding: 18,
+                          textAlign: 'left',
+                          cursor: 'pointer',
+                          background: active ? COLORS.blueSoft : '#fff',
+                          borderColor: active ? COLORS.blue : COLORS.border,
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'space-between',
+                        }}
+                      >
+                        <div style={{ fontWeight: 700 }}>{teacher.name}</div>
+                        <div style={{ color: COLORS.muted }}>⋮</div>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+
+              <div>
+                {sectionTitle(`Turmas · ${selectedTeacher.name}`)}
+                {groupedFolderClasses.map((group) => (
+                  <div key={group.day} style={{ marginTop: 16 }}>
+                    {sectionTitle(group.day)}
+                    <div style={{ overflowX: 'auto', marginTop: 12 }}>
+                      <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', ...cardStyle() }}>
+                        <thead>
+                          <tr style={{ borderBottom: `1px solid ${COLORS.border}`, textAlign: 'left' }}>
+                            <th style={{ padding: '12px 8px' }}>Horário</th>
+                            <th style={{ padding: '12px 8px' }}>Categoria</th>
+                            <th style={{ padding: '12px 8px' }}>Quadra</th>
+                            <th style={{ padding: '12px 8px' }}>Alunos</th>
+                            <th style={{ padding: '12px 8px' }}>Limite</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {group.classes.map((item) => (
+                            <tr key={item.id} style={{ borderBottom: `1px solid #F1F5F9` }}>
+                              <td style={{ padding: '12px 8px', fontWeight: 700 }}>{item.time}</td>
+                              <td style={{ padding: '12px 8px' }}>
+                                <select
+                                  value={item.category}
+                                  onChange={(e) => updateClassField(item.id, 'category', e.target.value)}
+                                  style={{
+                                    height: 38,
+                                    borderRadius: 10,
+                                    border: `1px solid ${COLORS.border}`,
+                                    padding: '0 10px',
+                                    minWidth: 220,
+                                  }}
+                                >
+                                  {(item.sport === 'Beach Tennis' ? categoryOptions.beach : categoryOptions.fute).map(
+                                    (option) => (
+                                      <option key={option} value={option}>
+                                        {option}
+                                      </option>
+                                    )
+                                  )}
+                                </select>
+                              </td>
+                              <td style={{ padding: '12px 8px' }}>
+                                <input
+                                  value={item.court}
+                                  onChange={(e) => updateClassField(item.id, 'court', e.target.value)}
+                                  placeholder="A definir"
+                                  style={{
+                                    height: 38,
+                                    borderRadius: 10,
+                                    border: `1px solid ${COLORS.border}`,
+                                    padding: '0 10px',
+                                    minWidth: 120,
+                                  }}
+                                />
+                              </td>
+                              <td style={{ padding: '12px 8px' }}>{item.students.map((s) => s.name).join(', ') || 'Sem alunos'}</td>
+                              <td style={{ padding: '12px 8px' }}>{item.limit}</td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                ))}
+
+                <div style={{ marginTop: 20 }}>
+                  {sectionTitle(`Lista de alunos · ${selectedTeacher.name}`)}
+                  <div style={{ overflowX: 'auto', marginTop: 12 }}>
+                    <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', ...cardStyle() }}>
+                      <thead>
+                        <tr style={{ borderBottom: `1px solid ${COLORS.border}`, textAlign: 'left' }}>
+                          <th style={{ padding: '12px 8px' }}>Aluno</th>
+                          <th style={{ padding: '12px 8px' }}>Turma</th>
+                          <th style={{ padding: '12px 8px' }}>Horário</th>
+                          <th style={{ padding: '12px 8px' }}>Quadra</th>
+                          <th style={{ padding: '12px 8px' }}>Status</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {sharedStudentsForSelectedTeacher.length > 0 ? (
+                          sharedStudentsForSelectedTeacher.map((student) => (
+                            <tr key={student.id} style={{ borderBottom: `1px solid #F1F5F9` }}>
+                              <td style={{ padding: '12px 8px', fontWeight: 700 }}>{student.name}</td>
+                              <td style={{ padding: '12px 8px' }}>{student.turma}</td>
+                              <td style={{ padding: '12px 8px' }}>{student.horario}</td>
+                              <td style={{ padding: '12px 8px' }}>{student.quadra}</td>
+                              <td style={{ padding: '12px 8px' }}>
+                                {student.status === 'inadimplente' ? (
+                                  <span
+                                    style={{
+                                      borderRadius: 999,
+                                      background: COLORS.redSoft,
+                                      color: COLORS.red,
+                                      padding: '4px 8px',
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                    }}
+                                  >
+                                    Inadimplente
+                                  </span>
+                                ) : (
+                                  <span
+                                    style={{
+                                      borderRadius: 999,
+                                      background: '#F8FAFC',
+                                      color: COLORS.muted,
+                                      padding: '4px 8px',
+                                      fontSize: 12,
+                                      fontWeight: 700,
+                                      border: `1px solid ${COLORS.border}`,
+                                    }}
+                                  >
+                                    Ativo
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={5} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
+                              Aguardando importação de alunos.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            </>
+          ) : (
+            <>
+              <div>
+                {sectionTitle('Cadastros')}
+              </div>
+
+              <div style={{ ...cardStyle(), padding: 20 }}>
+                <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16 }}>Cadastro de alunos</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+                  <input placeholder="Nome do aluno" style={inputStyle()} />
+                  <input placeholder="Telefone" style={inputStyle()} />
+                  <input placeholder="CPF" style={inputStyle()} />
+                  <input placeholder="Data de nascimento" style={inputStyle()} />
+                  <input placeholder="Responsável (se menor)" style={inputStyle()} />
+                  <input placeholder="Telefone do responsável" style={inputStyle()} />
+                </div>
+              </div>
+
+              <div style={{ ...cardStyle(), padding: 20 }}>
+                <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16 }}>
+                  Pasta · Aula experimental
+                </div>
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+                    <thead>
+                      <tr style={{ borderBottom: `1px solid ${COLORS.border}`, textAlign: 'left' }}>
+                        <th style={{ padding: '12px 8px' }}>Nome</th>
+                        <th style={{ padding: '12px 8px' }}>Telefone</th>
+                        <th style={{ padding: '12px 8px' }}>Modalidade</th>
+                        <th style={{ padding: '12px 8px' }}>Categoria</th>
+                        <th style={{ padding: '12px 8px' }}>Professor</th>
+                        <th style={{ padding: '12px 8px' }}>Agendamento</th>
+                        <th style={{ padding: '12px 8px' }}>Observações</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {experimentals.map((item) => (
+                        <tr key={item.id} style={{ borderBottom: `1px solid #F1F5F9` }}>
+                          <td style={{ padding: '12px 8px', fontWeight: 700 }}>{item.name}</td>
+                          <td style={{ padding: '12px 8px' }}>{item.phone}</td>
+                          <td style={{ padding: '12px 8px' }}>{item.modality}</td>
+                          <td style={{ padding: '12px 8px' }}>{item.category}</td>
+                          <td style={{ padding: '12px 8px' }}>{item.teacher}</td>
+                          <td style={{ padding: '12px 8px' }}>{item.scheduledDate} · {item.scheduledTime}</td>
+                          <td style={{ padding: '12px 8px' }}>{item.notes || '-'}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
@@ -1118,15 +1402,15 @@ export default function Home() {
     <main style={{ minHeight: '100vh', background: COLORS.bg, padding: 24, fontFamily: 'Arial, sans-serif' }}>
       <div style={{ maxWidth: 1280, margin: '0 auto', display: 'grid', gap: 24 }}>
         {renderHeader(
-          'Painel operacional',
-          'Visão da recepção e administração com professores, turmas, leads e financeiro.',
-          `Gestor Conexão · ${selectedUser.role === 'admin' ? 'Administração' : 'Recepção'}`
+          'Painel da administração',
+          'Gestão completa com turmas, cadastros e financeiro.',
+          'Gestor Conexão · Administração'
         )}
 
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0, 1fr))', gap: 16 }}>
           {[
             ['Turmas abertas', metrics.openClasses, 'Real x esperado'],
-            ['Leads', metrics.leads, 'Experimental / Avulsa'],
+            ['Experimentais', metrics.experimentals, 'Cadastros'],
             ['Alunos em aberto', metrics.overdue, 'Financeiro'],
             ['Total professor', metrics.teacherTotal, 'Repasse'],
             ['Total arena', metrics.arenaTotal, 'Saldo'],
@@ -1140,18 +1424,18 @@ export default function Home() {
         </div>
 
         <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-          <button onClick={() => setOpsTab('folder')} style={tabButton(opsTab === 'folder')}>
-            Professor
+          <button onClick={() => setAdminTab('classes')} style={tabButton(adminTab === 'classes')}>
+            Turmas e alunos
           </button>
-          <button onClick={() => setOpsTab('leads')} style={tabButton(opsTab === 'leads')}>
-            Experimental / Avulsa
+          <button onClick={() => setAdminTab('registrations')} style={tabButton(adminTab === 'registrations')}>
+            Cadastros
           </button>
-          <button onClick={() => setOpsTab('financial')} style={tabButton(opsTab === 'financial')}>
+          <button onClick={() => setAdminTab('financial')} style={tabButton(adminTab === 'financial')}>
             Financeiro
           </button>
         </div>
 
-        {opsTab === 'folder' ? (
+        {adminTab === 'classes' ? (
           <>
             <div>
               <div style={{ marginBottom: 10, color: COLORS.muted, fontWeight: 700 }}>Professores</div>
@@ -1182,183 +1466,120 @@ export default function Home() {
               </div>
             </div>
 
-            <div style={{ display: 'grid', gap: 20 }}>
-              <div>
-                {sectionTitle(`Pasta do professor · ${selectedTeacher.name}`)}
-              </div>
-
-              <div style={cardStyle()}>
-                <div style={{ padding: 20, borderBottom: `1px solid ${COLORS.border}`, fontWeight: 700, color: COLORS.blue }}>
-                  Lista de alunos
-                </div>
-                <div style={{ overflowX: 'auto', padding: 20 }}>
-                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+            {groupedFolderClasses.map((group) => (
+              <div key={group.day}>
+                {sectionTitle(`${selectedTeacher.name} · ${group.day}`)}
+                <div style={{ overflowX: 'auto', marginTop: 12 }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', ...cardStyle() }}>
                     <thead>
                       <tr style={{ borderBottom: `1px solid ${COLORS.border}`, textAlign: 'left' }}>
-                        <th style={{ padding: '12px 8px' }}>Aluno</th>
-                        <th style={{ padding: '12px 8px' }}>Modalidade</th>
-                        <th style={{ padding: '12px 8px' }}>Turma</th>
                         <th style={{ padding: '12px 8px' }}>Horário</th>
+                        <th style={{ padding: '12px 8px' }}>Categoria</th>
                         <th style={{ padding: '12px 8px' }}>Quadra</th>
-                        <th style={{ padding: '12px 8px' }}>Status</th>
+                        <th style={{ padding: '12px 8px' }}>Alunos</th>
+                        <th style={{ padding: '12px 8px' }}>Limite</th>
                       </tr>
                     </thead>
                     <tbody>
-                      <tr>
-                        <td colSpan={6} style={{ padding: 32, textAlign: 'center' }}>
-                          <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 8 }}>
-                            Aguardando importação ou cadastro dos alunos
-                          </div>
-                          <div style={{ color: COLORS.muted }}>
-                            A pasta do professor já está pronta. Os alunos podem ser incluídos depois.
-                          </div>
-                        </td>
-                      </tr>
+                      {group.classes.map((item) => (
+                        <tr key={item.id} style={{ borderBottom: `1px solid #F1F5F9` }}>
+                          <td style={{ padding: '12px 8px', fontWeight: 700 }}>{item.time}</td>
+                          <td style={{ padding: '12px 8px' }}>
+                            <select
+                              value={item.category}
+                              onChange={(e) => updateClassField(item.id, 'category', e.target.value)}
+                              style={{
+                                height: 38,
+                                borderRadius: 10,
+                                border: `1px solid ${COLORS.border}`,
+                                padding: '0 10px',
+                                minWidth: 220,
+                              }}
+                            >
+                              {(item.sport === 'Beach Tennis' ? categoryOptions.beach : categoryOptions.fute).map(
+                                (option) => (
+                                  <option key={option} value={option}>
+                                    {option}
+                                  </option>
+                                )
+                              )}
+                            </select>
+                          </td>
+                          <td style={{ padding: '12px 8px' }}>
+                            <input
+                              value={item.court}
+                              onChange={(e) => updateClassField(item.id, 'court', e.target.value)}
+                              placeholder="A definir"
+                              style={{
+                                height: 38,
+                                borderRadius: 10,
+                                border: `1px solid ${COLORS.border}`,
+                                padding: '0 10px',
+                                minWidth: 120,
+                              }}
+                            />
+                          </td>
+                          <td style={{ padding: '12px 8px' }}>{item.students.map((s) => s.name).join(', ') || 'Sem alunos'}</td>
+                          <td style={{ padding: '12px 8px' }}>{item.limit}</td>
+                        </tr>
+                      ))}
                     </tbody>
                   </table>
                 </div>
               </div>
+            ))}
+          </>
+        ) : null}
 
-              {groupedFolderClasses.map((group) => (
-                <div key={group.day}>
-                  {sectionTitle(group.day)}
-                  <div style={{ overflowX: 'auto', marginTop: 12 }}>
-                    <table style={{ width: '100%', borderCollapse: 'collapse', background: '#fff', ...cardStyle() }}>
-                      <thead>
-                        <tr style={{ borderBottom: `1px solid ${COLORS.border}`, textAlign: 'left' }}>
-                          <th style={{ padding: '12px 8px' }}>Horário</th>
-                          <th style={{ padding: '12px 8px' }}>Modalidade</th>
-                          <th style={{ padding: '12px 8px' }}>Categoria</th>
-                          <th style={{ padding: '12px 8px' }}>Quadra</th>
-                          <th style={{ padding: '12px 8px' }}>Marcadores</th>
-                          <th style={{ padding: '12px 8px' }}>Alunos</th>
-                          <th style={{ padding: '12px 8px' }}>Limite</th>
-                          <th style={{ padding: '12px 8px' }}>Status</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {group.classes.map((item) => (
-                          <tr key={item.id} style={{ borderBottom: `1px solid #F1F5F9` }}>
-                            <td style={{ padding: '12px 8px', fontWeight: 700 }}>{item.time}</td>
-                            <td style={{ padding: '12px 8px' }}>{item.sport}</td>
-                            <td style={{ padding: '12px 8px' }}>
-                              <select
-                                value={item.category}
-                                onChange={(e) => updateClassField(item.id, 'category', e.target.value)}
-                                style={{
-                                  height: 38,
-                                  borderRadius: 10,
-                                  border: `1px solid ${COLORS.border}`,
-                                  padding: '0 10px',
-                                  minWidth: 220,
-                                }}
-                              >
-                                {(item.sport === 'Beach Tennis' ? categoryOptions.beach : categoryOptions.fute).map(
-                                  (option) => (
-                                    <option key={option} value={option}>
-                                      {option}
-                                    </option>
-                                  )
-                                )}
-                              </select>
-                            </td>
-                            <td style={{ padding: '12px 8px' }}>
-                              <input
-                                value={item.court}
-                                onChange={(e) => updateClassField(item.id, 'court', e.target.value)}
-                                placeholder="A definir"
-                                style={{
-                                  height: 38,
-                                  borderRadius: 10,
-                                  border: `1px solid ${COLORS.border}`,
-                                  padding: '0 10px',
-                                  minWidth: 120,
-                                }}
-                              />
-                            </td>
-                            <td style={{ padding: '12px 8px' }}>
-                              <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
-                                {['Fixo', 'Reposição', 'Avulsa', 'Experimental'].map((tag) => (
-                                  <span
-                                    key={tag}
-                                    style={{
-                                      border: `1px solid ${COLORS.border}`,
-                                      borderRadius: 999,
-                                      padding: '4px 8px',
-                                      fontSize: 12,
-                                    }}
-                                  >
-                                    {tag}
-                                  </span>
-                                ))}
-                              </div>
-                            </td>
-                            <td style={{ padding: '12px 8px' }}>{item.students.length}</td>
-                            <td style={{ padding: '12px 8px' }}>{item.limit}</td>
-                            <td style={{ padding: '12px 8px' }}>
-                              <span
-                                style={{
-                                  borderRadius: 999,
-                                  border: `1px solid ${COLORS.border}`,
-                                  padding: '6px 10px',
-                                  fontSize: 12,
-                                  fontWeight: 700,
-                                }}
-                              >
-                                {item.status === 'open'
-                                  ? 'Turma aberta'
-                                  : item.status === 'closed'
-                                    ? 'Encerrada'
-                                    : 'Próxima turma'}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              ))}
+        {adminTab === 'registrations' ? (
+          <>
+            <div style={{ ...cardStyle(), padding: 20 }}>
+              <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16 }}>Cadastro de alunos</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 12 }}>
+                <input placeholder="Nome do aluno" style={inputStyle()} />
+                <input placeholder="Telefone" style={inputStyle()} />
+                <input placeholder="CPF" style={inputStyle()} />
+                <input placeholder="Data de nascimento" style={inputStyle()} />
+                <input placeholder="Responsável (se menor)" style={inputStyle()} />
+                <input placeholder="Telefone do responsável" style={inputStyle()} />
+              </div>
+            </div>
+
+            <div style={{ ...cardStyle(), padding: 20 }}>
+              <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16 }}>Pasta · Aula experimental</div>
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 14 }}>
+                  <thead>
+                    <tr style={{ borderBottom: `1px solid ${COLORS.border}`, textAlign: 'left' }}>
+                      <th style={{ padding: '12px 8px' }}>Nome</th>
+                      <th style={{ padding: '12px 8px' }}>Telefone</th>
+                      <th style={{ padding: '12px 8px' }}>Modalidade</th>
+                      <th style={{ padding: '12px 8px' }}>Categoria</th>
+                      <th style={{ padding: '12px 8px' }}>Professor</th>
+                      <th style={{ padding: '12px 8px' }}>Agendamento</th>
+                      <th style={{ padding: '12px 8px' }}>Observações</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {experimentals.map((item) => (
+                      <tr key={item.id} style={{ borderBottom: `1px solid #F1F5F9` }}>
+                        <td style={{ padding: '12px 8px', fontWeight: 700 }}>{item.name}</td>
+                        <td style={{ padding: '12px 8px' }}>{item.phone}</td>
+                        <td style={{ padding: '12px 8px' }}>{item.modality}</td>
+                        <td style={{ padding: '12px 8px' }}>{item.category}</td>
+                        <td style={{ padding: '12px 8px' }}>{item.teacher}</td>
+                        <td style={{ padding: '12px 8px' }}>{item.scheduledDate} · {item.scheduledTime}</td>
+                        <td style={{ padding: '12px 8px' }}>{item.notes || '-'}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         ) : null}
 
-        {opsTab === 'leads' ? (
-          <div>
-            {sectionTitle('Experimental / Avulsa')}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 16, marginTop: 16 }}>
-              {leads.map((lead) => (
-                <div key={lead.id} style={{ ...cardStyle(), padding: 20 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12 }}>
-                    <div style={{ fontWeight: 700 }}>{lead.name}</div>
-                    <span
-                      style={{
-                        borderRadius: 999,
-                        background: lead.type === 'Experimental' ? COLORS.greenSoft : COLORS.blueSoft,
-                        color: lead.type === 'Experimental' ? COLORS.green : COLORS.blue,
-                        padding: '6px 12px',
-                        fontWeight: 700,
-                        fontSize: 12,
-                      }}
-                    >
-                      {lead.type}
-                    </span>
-                  </div>
-                  <div style={{ marginTop: 10, color: COLORS.muted, fontSize: 14 }}>{lead.phone}</div>
-                  <div style={{ marginTop: 10, color: COLORS.blue, fontWeight: 700 }}>
-                    {lead.modality} · {lead.category}
-                  </div>
-                  <div style={{ marginTop: 8, color: COLORS.muted, fontSize: 14 }}>Professor: {lead.teacher}</div>
-                  <div style={{ marginTop: 6, color: COLORS.muted, fontSize: 14 }}>
-                    Agendado: {lead.scheduledDate} · {lead.scheduledTime}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        ) : null}
-
-        {opsTab === 'financial' ? (
+        {adminTab === 'financial' ? (
           <div>
             {sectionTitle('Financeiro')}
 
@@ -1464,52 +1685,28 @@ export default function Home() {
                             <input
                               value={row.student}
                               onChange={(e) => updateFinancialField(row.id, 'student', e.target.value)}
-                              style={{
-                                width: '100%',
-                                height: 38,
-                                borderRadius: 10,
-                                border: `1px solid ${COLORS.border}`,
-                                padding: '0 10px',
-                              }}
+                              style={inputStyle()}
                             />
                           </td>
                           <td style={{ padding: '12px 8px', minWidth: 140 }}>
                             <input
                               value={row.notReceived}
                               onChange={(e) => updateFinancialField(row.id, 'notReceived', e.target.value)}
-                              style={{
-                                width: '100%',
-                                height: 38,
-                                borderRadius: 10,
-                                border: `1px solid ${COLORS.border}`,
-                                padding: '0 10px',
-                              }}
+                              style={inputStyle()}
                             />
                           </td>
                           <td style={{ padding: '12px 8px', minWidth: 140 }}>
                             <input
                               value={row.received}
                               onChange={(e) => updateFinancialField(row.id, 'received', e.target.value)}
-                              style={{
-                                width: '100%',
-                                height: 38,
-                                borderRadius: 10,
-                                border: `1px solid ${COLORS.border}`,
-                                padding: '0 10px',
-                              }}
+                              style={inputStyle()}
                             />
                           </td>
                           <td style={{ padding: '12px 8px', minWidth: 180 }}>
                             <input
                               value={row.paymentMethod}
                               onChange={(e) => updateFinancialField(row.id, 'paymentMethod', e.target.value)}
-                              style={{
-                                width: '100%',
-                                height: 38,
-                                borderRadius: 10,
-                                border: `1px solid ${COLORS.border}`,
-                                padding: '0 10px',
-                              }}
+                              style={inputStyle()}
                             />
                           </td>
                           <td style={{ padding: '12px 8px', fontWeight: 700, color: COLORS.blue }}>
@@ -1542,4 +1739,14 @@ export default function Home() {
       </div>
     </main>
   );
+}
+
+function inputStyle(): React.CSSProperties {
+  return {
+    width: '100%',
+    height: 38,
+    borderRadius: 10,
+    border: `1px solid ${COLORS.border}`,
+    padding: '0 10px',
+  };
 }
