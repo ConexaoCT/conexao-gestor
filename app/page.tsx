@@ -1,6 +1,7 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 type UserRole = 'teacher' | 'reception' | 'admin';
 type ClassStatus = 'open' | 'upcoming' | 'closed';
@@ -10,7 +11,7 @@ type TeacherTab = 'today' | 'space';
 type ReceptionTab = 'classes' | 'registrations';
 type AdminTab = 'classes' | 'registrations' | 'financial';
 
-type User = {
+type LoginUser = {
   id: string;
   name: string;
   initials: string;
@@ -19,15 +20,80 @@ type User = {
   sport?: Sport;
 };
 
-type Student = {
+type DbProfessor = {
   id: string;
-  name: string;
-  status?: 'ativo' | 'inadimplente';
-  tag?: 'Fixo' | 'Reposição' | 'Avulsa' | 'Experimental' | 'Extra';
-  present?: boolean;
+  nome: string;
+  percentual: number;
 };
 
-type ClassItem = {
+type DbAluno = {
+  id: string;
+  nome: string;
+  status: string | null;
+  telefone: string | null;
+  cpf: string | null;
+  data_nascimento: string | null;
+  responsavel_nome: string | null;
+  responsavel_telefone: string | null;
+  tipo: string | null;
+};
+
+type DbTurma = {
+  id: string;
+  professor_id: string | null;
+  dia: string | null;
+  horario: string | null;
+  limite: number | null;
+  categoria: string | null;
+  quadra: string | null;
+};
+
+type DbTurmaAluno = {
+  id: string;
+  turma_id: string | null;
+  aluno_id: string | null;
+};
+
+type DbPresenca = {
+  id: string;
+  aluno_id: string | null;
+  turma_id: string | null;
+  data: string | null;
+};
+
+type DbFinanceiro = {
+  id: string;
+  aluno_id: string | null;
+  professor_id: string | null;
+  valor: number | null;
+  recebido: boolean | null;
+  forma_pagamento: string | null;
+  mes: string | null;
+};
+
+type DbExperimental = {
+  id: string;
+  nome: string;
+  telefone: string | null;
+  modalidade: string | null;
+  categoria: string | null;
+  professor_id: string | null;
+  data_agendada: string | null;
+  horario_agendado: string | null;
+  observacoes: string | null;
+};
+
+type StudentCard = {
+  id: string;
+  name: string;
+  status: 'ativo' | 'inadimplente';
+  tag: 'Fixo' | 'Reposição' | 'Avulsa' | 'Experimental' | 'Extra';
+  present: boolean;
+  phone?: string;
+  cpf?: string;
+};
+
+type ClassCard = {
   id: string;
   teacherId: string;
   teacherName: string;
@@ -37,29 +103,31 @@ type ClassItem = {
   category: string;
   court: string;
   limit: number;
-  status: ClassStatus;
-  students: Student[];
+  students: StudentCard[];
 };
 
-type ExperimentalLead = {
+type ExperimentalCard = {
   id: string;
   name: string;
   phone: string;
-  modality: Sport;
+  modality: string;
   category: string;
   teacher: string;
   scheduledDate: string;
   scheduledTime: string;
-  notes?: string;
+  notes: string;
 };
 
-type FinancialRow = {
+type FinancialRowView = {
   id: string;
+  alunoId: string;
+  professorId: string;
   student: string;
-  notReceived: string;
-  received: string;
-  paymentMethod: string;
   teacher: string;
+  value: number;
+  received: boolean;
+  paymentMethod: string;
+  month: string;
 };
 
 const COLORS = {
@@ -76,15 +144,6 @@ const COLORS = {
   amber: '#92400E',
   amberSoft: '#FFFBEB',
 };
-
-const users: User[] = [
-  { id: 't1', name: 'Hugo Leonardo', initials: 'HL', pin: '1111', role: 'teacher', sport: 'Beach Tennis' },
-  { id: 't2', name: 'Felipe Zago', initials: 'FZ', pin: '2222', role: 'teacher', sport: 'Beach Tennis' },
-  { id: 't3', name: 'Rudiery', initials: 'RU', pin: '3333', role: 'teacher', sport: 'Beach Tennis' },
-  { id: 't4', name: 'João José', initials: 'JJ', pin: '4444', role: 'teacher', sport: 'Futevôlei' },
-  { id: 'r1', name: 'Recepção CT', initials: 'RC', pin: '5555', role: 'reception' },
-  { id: 'a1', name: 'Admin CT', initials: 'AC', pin: '9999', role: 'admin' },
-];
 
 const categoryOptions = {
   beach: [
@@ -114,135 +173,9 @@ const categoryOptions = {
   ],
 };
 
-const initialClasses: ClassItem[] = [
-  {
-    id: 'h-seg-19',
-    teacherId: 't1',
-    teacherName: 'Hugo Leonardo',
-    sport: 'Beach Tennis',
-    day: 'Segunda',
-    time: '19:00',
-    category: 'Intermediário 2',
-    court: '',
-    limit: 5,
-    status: 'upcoming',
-    students: [
-      { id: 's1', name: 'Kerol', status: 'ativo', tag: 'Fixo', present: false },
-      { id: 's2', name: 'Rafaela', status: 'ativo', tag: 'Experimental', present: false },
-      { id: 's3', name: 'Fernanda', status: 'inadimplente', tag: 'Fixo', present: false },
-      { id: 's4', name: 'Graziela', status: 'ativo', tag: 'Avulsa', present: false },
-    ],
-  },
-  {
-    id: 'h-ter-18',
-    teacherId: 't1',
-    teacherName: 'Hugo Leonardo',
-    sport: 'Beach Tennis',
-    day: 'Terça',
-    time: '18:00',
-    category: 'Iniciante 2',
-    court: '',
-    limit: 5,
-    status: 'upcoming',
-    students: [
-      { id: 's5', name: 'Manu', status: 'ativo', tag: 'Fixo', present: false },
-      { id: 's6', name: 'Bruna', status: 'ativo', tag: 'Reposição', present: false },
-    ],
-  },
-  {
-    id: 'z-seg-18',
-    teacherId: 't2',
-    teacherName: 'Felipe Zago',
-    sport: 'Beach Tennis',
-    day: 'Segunda',
-    time: '18:00',
-    category: 'Iniciante 1',
-    court: '',
-    limit: 5,
-    status: 'upcoming',
-    students: [
-      { id: 's7', name: 'Mario Cesar', status: 'ativo', tag: 'Fixo', present: false },
-      { id: 's8', name: 'Renata Paiva', status: 'ativo', tag: 'Fixo', present: false },
-      { id: 's9', name: 'Vinicius Freitas', status: 'inadimplente', tag: 'Fixo', present: false },
-    ],
-  },
-  {
-    id: 'r-seg-17',
-    teacherId: 't3',
-    teacherName: 'Rudiery',
-    sport: 'Beach Tennis',
-    day: 'Segunda',
-    time: '17:00',
-    category: 'Iniciante',
-    court: '',
-    limit: 5,
-    status: 'upcoming',
-    students: [
-      { id: 's10', name: 'Germano Reis', status: 'ativo', tag: 'Fixo', present: false },
-      { id: 's11', name: 'Alex Eduart', status: 'ativo', tag: 'Fixo', present: false },
-    ],
-  },
-  {
-    id: 'j-ter-19',
-    teacherId: 't4',
-    teacherName: 'João José',
-    sport: 'Futevôlei',
-    day: 'Terça',
-    time: '19:00',
-    category: 'Aprendiz - Exp',
-    court: '',
-    limit: 6,
-    status: 'upcoming',
-    students: [
-      { id: 's12', name: 'Sofia', status: 'ativo', tag: 'Fixo', present: false },
-      { id: 's13', name: 'Maria Luiza', status: 'ativo', tag: 'Fixo', present: false },
-      { id: 's14', name: 'Luana', status: 'ativo', tag: 'Experimental', present: false },
-    ],
-  },
-];
-
-const initialExperimentals: ExperimentalLead[] = [
-  {
-    id: 'lead-1',
-    name: 'Patrícia Lima',
-    phone: '(34) 99999-1001',
-    modality: 'Beach Tennis',
-    category: 'Iniciante 1',
-    teacher: 'Hugo Leonardo',
-    scheduledDate: '24/03/2026',
-    scheduledTime: '18:00',
-    notes: 'Entrou em contato pelo Instagram',
-  },
-  {
-    id: 'lead-2',
-    name: 'Thiago Lopes',
-    phone: '(34) 99999-1002',
-    modality: 'Futevôlei',
-    category: 'Intermediário',
-    teacher: 'João José',
-    scheduledDate: '25/03/2026',
-    scheduledTime: '19:00',
-    notes: 'Quer testar turma da noite',
-  },
-];
-
-const teacherRates: Record<string, number> = {
-  'Felipe Zago': 0.45,
-  'Hugo Leonardo': 0.45,
-  'João José': 0.3,
-  Rudiery: 0.35,
-};
-
-const initialFinancialByMonth: Record<string, FinancialRow[]> = {
-  MARÇO: [
-    { id: 'f1', student: 'Kerol', notReceived: '', received: '305,00', paymentMethod: 'PIX', teacher: 'Hugo Leonardo' },
-    { id: 'f2', student: 'Fernanda', notReceived: '305,00', received: '', paymentMethod: '', teacher: 'Hugo Leonardo' },
-    { id: 'f3', student: 'Mario Cesar', notReceived: '', received: '305,00', paymentMethod: 'PIX', teacher: 'Felipe Zago' },
-    { id: 'f4', student: 'Germano Reis', notReceived: '', received: '153,75', paymentMethod: 'PIX', teacher: 'Rudiery' },
-    { id: 'f5', student: 'Sofia', notReceived: '', received: '250,00', paymentMethod: 'DINHEIRO', teacher: 'João José' },
-  ],
-  ABRIL: [],
-  MAIO: [],
+const FIXED_ACCESS = {
+  admin: { id: 'admin-fixed', name: 'Admin CT', pin: '9999', role: 'admin' as const },
+  reception: { id: 'reception-fixed', name: 'Recepção CT', pin: '5555', role: 'reception' as const },
 };
 
 function formatCurrency(value: number) {
@@ -252,14 +185,35 @@ function formatCurrency(value: number) {
   }).format(value || 0);
 }
 
-function parseMoney(value: string) {
+function parseBRL(value: string) {
   if (!value) return 0;
   const normalized = value.replace(/\./g, '').replace(',', '.').replace(/[^\d.-]/g, '');
   const parsed = Number(normalized);
   return Number.isFinite(parsed) ? parsed : 0;
 }
 
-function groupByDay(items: ClassItem[]) {
+function formatInputMoney(value: number) {
+  return value ? value.toFixed(2).replace('.', ',') : '';
+}
+
+function toStatus(value?: string | null): 'ativo' | 'inadimplente' {
+  return value === 'inadimplente' ? 'inadimplente' : 'ativo';
+}
+
+function toTag(value?: string | null): 'Fixo' | 'Reposição' | 'Avulsa' | 'Experimental' | 'Extra' {
+  const normalized = (value || '').toLowerCase();
+  if (normalized === 'experimental') return 'Experimental';
+  if (normalized === 'avulsa') return 'Avulsa';
+  if (normalized === 'reposição' || normalized === 'reposicao') return 'Reposição';
+  if (normalized === 'extra') return 'Extra';
+  return 'Fixo';
+}
+
+function teacherSport(name: string): Sport {
+  return name === 'João José' ? 'Futevôlei' : 'Beach Tennis';
+}
+
+function groupByDay(items: ClassCard[]) {
   const order = ['Segunda', 'Terça', 'Quarta', 'Quinta', 'Sexta', 'Sábado', 'Domingo'];
   return order
     .map((day) => ({
@@ -273,6 +227,15 @@ function sortByName<T extends { name: string }>(items: T[]) {
   return [...items].sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
 }
 
+function initialsFromName(name: string) {
+  return name
+    .split(' ')
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase() || '')
+    .join('');
+}
+
 function cardStyle(): React.CSSProperties {
   return {
     background: '#fff',
@@ -282,27 +245,20 @@ function cardStyle(): React.CSSProperties {
   };
 }
 
-function tabButton(active: boolean): React.CSSProperties {
-  return {
+function studentTagStyle(tag?: StudentCard['tag']): React.CSSProperties {
+  const base: React.CSSProperties = {
     borderRadius: 999,
-    padding: '10px 16px',
-    border: `1px solid ${active ? COLORS.blue : COLORS.border}`,
-    background: active ? COLORS.blueSoft : '#fff',
-    color: active ? COLORS.blue : COLORS.muted,
+    padding: '4px 8px',
+    fontSize: 12,
     fontWeight: 700,
-    cursor: 'pointer',
+    display: 'inline-block',
   };
-}
 
-function inputStyle(): React.CSSProperties {
-  return {
-    width: '100%',
-    height: 38,
-    borderRadius: 10,
-    border: `1px solid ${COLORS.border}`,
-    padding: '0 10px',
-    fontSize: 14,
-  };
+  if (tag === 'Experimental') return { ...base, background: COLORS.greenSoft, color: COLORS.green };
+  if (tag === 'Avulsa') return { ...base, background: COLORS.blueSoft, color: COLORS.blue };
+  if (tag === 'Reposição') return { ...base, background: '#FEF3C7', color: '#92400E' };
+  if (tag === 'Extra') return { ...base, background: '#F3E8FF', color: '#7C3AED' };
+  return { ...base, background: '#F8FAFC', color: COLORS.muted, border: `1px solid ${COLORS.border}` };
 }
 
 function sectionTitle(text: string) {
@@ -321,58 +277,283 @@ function sectionTitle(text: string) {
   );
 }
 
-function studentTagStyle(tag?: Student['tag']): React.CSSProperties {
-  const base: React.CSSProperties = {
-    borderRadius: 999,
-    padding: '4px 8px',
-    fontSize: 12,
-    fontWeight: 700,
-    display: 'inline-block',
+function inputStyle(): React.CSSProperties {
+  return {
+    width: '100%',
+    height: 38,
+    borderRadius: 10,
+    border: `1px solid ${COLORS.border}`,
+    padding: '0 10px',
+    fontSize: 14,
+    background: '#fff',
   };
-
-  if (tag === 'Experimental') return { ...base, background: COLORS.greenSoft, color: COLORS.green };
-  if (tag === 'Avulsa') return { ...base, background: COLORS.blueSoft, color: COLORS.blue };
-  if (tag === 'Reposição') return { ...base, background: '#FEF3C7', color: '#92400E' };
-  if (tag === 'Extra') return { ...base, background: '#F3E8FF', color: '#7C3AED' };
-  return { ...base, background: '#F8FAFC', color: COLORS.muted, border: `1px solid ${COLORS.border}` };
 }
 
 export default function Home() {
+  const [loading, setLoading] = useState(true);
   const [screen, setScreen] = useState<'login' | 'teacher' | 'reception' | 'admin'>('login');
   const [loginTab, setLoginTab] = useState<LoginTab>('admin');
-  const [selectedTeacherIdForLogin, setSelectedTeacherIdForLogin] = useState('t2');
-  const [selectedRoleUserId, setSelectedRoleUserId] = useState('a1');
-  const [selectedTeacherFolderId, setSelectedTeacherFolderId] = useState('t2');
   const [teacherTab, setTeacherTab] = useState<TeacherTab>('today');
   const [receptionTab, setReceptionTab] = useState<ReceptionTab>('classes');
   const [adminTab, setAdminTab] = useState<AdminTab>('classes');
   const [pin, setPin] = useState('');
   const [pinError, setPinError] = useState('');
   const [classSearch, setClassSearch] = useState('');
-  const [classes, setClasses] = useState<ClassItem[]>(initialClasses);
-  const [experimentals] = useState(initialExperimentals);
-  const [financialByMonth, setFinancialByMonth] = useState(initialFinancialByMonth);
+  const [selectedTeacherIdForLogin, setSelectedTeacherIdForLogin] = useState('');
+  const [selectedRoleUserId, setSelectedRoleUserId] = useState(FIXED_ACCESS.admin.id);
+  const [selectedTeacherFolderId, setSelectedTeacherFolderId] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('MARÇO');
+  const [classUiStatus, setClassUiStatus] = useState<Record<string, ClassStatus>>({});
 
-  const sortedTeachers = useMemo(() => sortByName(users.filter((u) => u.role === 'teacher')), []);
-  const sortedReceptionUsers = useMemo(() => sortByName(users.filter((u) => u.role === 'reception')), []);
-  const sortedAdminUsers = useMemo(() => sortByName(users.filter((u) => u.role === 'admin')), []);
+  const [dbProfessores, setDbProfessores] = useState<DbProfessor[]>([]);
+  const [dbAlunos, setDbAlunos] = useState<DbAluno[]>([]);
+  const [dbTurmas, setDbTurmas] = useState<DbTurma[]>([]);
+  const [dbTurmaAlunos, setDbTurmaAlunos] = useState<DbTurmaAluno[]>([]);
+  const [dbPresencasHoje, setDbPresencasHoje] = useState<DbPresenca[]>([]);
+  const [dbFinanceiro, setDbFinanceiro] = useState<DbFinanceiro[]>([]);
+  const [dbExperimentais, setDbExperimentais] = useState<DbExperimental[]>([]);
 
-  const currentLoginUser =
+  async function loadAllData() {
+    setLoading(true);
+
+    const todayStart = new Date();
+    todayStart.setHours(0, 0, 0, 0);
+
+    const todayEnd = new Date();
+    todayEnd.setHours(23, 59, 59, 999);
+
+    const [
+      profRes,
+      alunosRes,
+      turmasRes,
+      turmaAlunosRes,
+      presencasRes,
+      financeiroRes,
+      experimentaisRes,
+    ] = await Promise.all([
+      supabase.from('professores').select('*').order('nome'),
+      supabase.from('alunos').select('*').order('nome'),
+      supabase.from('turmas').select('*'),
+      supabase.from('turma_alunos').select('*'),
+      supabase
+        .from('presencas')
+        .select('*')
+        .gte('data', todayStart.toISOString())
+        .lte('data', todayEnd.toISOString()),
+      supabase.from('financeiro').select('*'),
+      supabase.from('experimentais').select('*'),
+    ]);
+
+    if (profRes.error) console.error(profRes.error);
+    if (alunosRes.error) console.error(alunosRes.error);
+    if (turmasRes.error) console.error(turmasRes.error);
+    if (turmaAlunosRes.error) console.error(turmaAlunosRes.error);
+    if (presencasRes.error) console.error(presencasRes.error);
+    if (financeiroRes.error) console.error(financeiroRes.error);
+    if (experimentaisRes.error) console.error(experimentaisRes.error);
+
+    setDbProfessores((profRes.data || []) as DbProfessor[]);
+    setDbAlunos((alunosRes.data || []) as DbAluno[]);
+    setDbTurmas((turmasRes.data || []) as DbTurma[]);
+    setDbTurmaAlunos((turmaAlunosRes.data || []) as DbTurmaAluno[]);
+    setDbPresencasHoje((presencasRes.data || []) as DbPresenca[]);
+    setDbFinanceiro((financeiroRes.data || []) as DbFinanceiro[]);
+    setDbExperimentais((experimentaisRes.data || []) as DbExperimental[]);
+
+    setLoading(false);
+  }
+
+  useEffect(() => {
+    loadAllData();
+  }, []);
+
+  const teacherUsers: LoginUser[] = useMemo(() => {
+    const pinMap: Record<string, string> = {
+      'Hugo Leonardo': '1111',
+      'Felipe Zago': '2222',
+      Rudiery: '3333',
+      'João José': '4444',
+    };
+
+    return sortByName(
+      dbProfessores.map((prof) => ({
+        id: prof.id,
+        name: prof.nome,
+        initials: initialsFromName(prof.nome),
+        pin: pinMap[prof.nome] || '0000',
+        role: 'teacher' as const,
+        sport: teacherSport(prof.nome),
+      }))
+    );
+  }, [dbProfessores]);
+
+  useEffect(() => {
+    if (!selectedTeacherIdForLogin && teacherUsers.length > 0) {
+      setSelectedTeacherIdForLogin(teacherUsers[0].id);
+    }
+    if (!selectedTeacherFolderId && teacherUsers.length > 0) {
+      setSelectedTeacherFolderId(teacherUsers[0].id);
+    }
+  }, [teacherUsers, selectedTeacherIdForLogin, selectedTeacherFolderId]);
+
+  useEffect(() => {
+    if (Object.keys(classUiStatus).length === 0 && dbTurmas.length > 0) {
+      const next: Record<string, ClassStatus> = {};
+      dbTurmas.forEach((turma) => {
+        next[turma.id] = 'upcoming';
+      });
+      setClassUiStatus(next);
+    }
+  }, [dbTurmas, classUiStatus]);
+
+  const sortedReceptionUsers: LoginUser[] = [
+    {
+      id: FIXED_ACCESS.reception.id,
+      name: FIXED_ACCESS.reception.name,
+      initials: initialsFromName(FIXED_ACCESS.reception.name),
+      pin: FIXED_ACCESS.reception.pin,
+      role: 'reception',
+    },
+  ];
+
+  const sortedAdminUsers: LoginUser[] = [
+    {
+      id: FIXED_ACCESS.admin.id,
+      name: FIXED_ACCESS.admin.name,
+      initials: initialsFromName(FIXED_ACCESS.admin.name),
+      pin: FIXED_ACCESS.admin.pin,
+      role: 'admin',
+    },
+  ];
+
+  const currentLoginUser: LoginUser =
     loginTab === 'teachers'
-      ? users.find((u) => u.id === selectedTeacherIdForLogin) || users[0]
-      : users.find((u) => u.id === selectedRoleUserId) || users[0];
+      ? teacherUsers.find((u) => u.id === selectedTeacherIdForLogin) || teacherUsers[0]
+      : loginTab === 'reception'
+        ? sortedReceptionUsers[0]
+        : sortedAdminUsers[0];
+
+  const attendanceSet = useMemo(() => {
+    const set = new Set<string>();
+    dbPresencasHoje.forEach((item) => {
+      if (item.turma_id && item.aluno_id) {
+        set.add(`${item.turma_id}_${item.aluno_id}`);
+      }
+    });
+    return set;
+  }, [dbPresencasHoje]);
+
+  const assembledClasses: ClassCard[] = useMemo(() => {
+    return dbTurmas
+      .map((turma) => {
+        const professor = dbProfessores.find((p) => p.id === turma.professor_id);
+        if (!professor) return null;
+
+        const studentIds = dbTurmaAlunos
+          .filter((ta) => ta.turma_id === turma.id && ta.aluno_id)
+          .map((ta) => ta.aluno_id as string);
+
+        const students = studentIds
+          .map((studentId) => {
+            const aluno = dbAlunos.find((a) => a.id === studentId);
+            if (!aluno) return null;
+
+            return {
+              id: aluno.id,
+              name: aluno.nome,
+              status: toStatus(aluno.status),
+              tag: toTag(aluno.tipo),
+              present: attendanceSet.has(`${turma.id}_${aluno.id}`),
+              phone: aluno.telefone || '',
+              cpf: aluno.cpf || '',
+            } satisfies StudentCard;
+          })
+          .filter(Boolean) as StudentCard[];
+
+        return {
+          id: turma.id,
+          teacherId: professor.id,
+          teacherName: professor.nome,
+          sport: teacherSport(professor.nome),
+          day: turma.dia || 'Sem dia',
+          time: turma.horario || 'Sem horário',
+          category: turma.categoria || 'A definir',
+          court: turma.quadra || 'A definir',
+          limit: turma.limite || 0,
+          students: students.sort((a, b) => a.name.localeCompare(b.name, 'pt-BR')),
+        } satisfies ClassCard;
+      })
+      .filter(Boolean)
+      .sort((a, b) => {
+        if (a!.teacherName !== b!.teacherName) return a!.teacherName.localeCompare(b!.teacherName, 'pt-BR');
+        if (a!.day !== b!.day) return a!.day.localeCompare(b!.day, 'pt-BR');
+        return a!.time.localeCompare(b!.time);
+      }) as ClassCard[];
+  }, [dbTurmas, dbProfessores, dbTurmaAlunos, dbAlunos, attendanceSet]);
+
+  const experimentalsView: ExperimentalCard[] = useMemo(() => {
+    return dbExperimentais
+      .map((item) => {
+        const professor = dbProfessores.find((p) => p.id === item.professor_id);
+        return {
+          id: item.id,
+          name: item.nome,
+          phone: item.telefone || '',
+          modality: item.modalidade || '',
+          category: item.categoria || '',
+          teacher: professor?.nome || 'Sem professor',
+          scheduledDate: item.data_agendada || '',
+          scheduledTime: item.horario_agendado || '',
+          notes: item.observacoes || '',
+        };
+      })
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
+  }, [dbExperimentais, dbProfessores]);
+
+  const financialRows: FinancialRowView[] = useMemo(() => {
+    return dbFinanceiro
+      .map((row) => {
+        const aluno = dbAlunos.find((a) => a.id === row.aluno_id);
+        const professor = dbProfessores.find((p) => p.id === row.professor_id);
+
+        return {
+          id: row.id,
+          alunoId: row.aluno_id || '',
+          professorId: row.professor_id || '',
+          student: aluno?.nome || 'Sem aluno',
+          teacher: professor?.nome || 'Sem professor',
+          value: row.valor || 0,
+          received: !!row.recebido,
+          paymentMethod: row.forma_pagamento || '',
+          month: row.mes || 'SEM MÊS',
+        };
+      })
+      .sort((a, b) => a.student.localeCompare(b.student, 'pt-BR'));
+  }, [dbFinanceiro, dbAlunos, dbProfessores]);
+
+  const availableMonths = useMemo(() => {
+    const set = new Set(financialRows.map((row) => row.month));
+    if (set.size === 0) set.add('MARÇO');
+    return Array.from(set).sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [financialRows]);
+
+  useEffect(() => {
+    if (!availableMonths.includes(selectedMonth) && availableMonths.length > 0) {
+      setSelectedMonth(availableMonths[0]);
+    }
+  }, [availableMonths, selectedMonth]);
+
+  const monthRows = useMemo(() => financialRows.filter((row) => row.month === selectedMonth), [financialRows, selectedMonth]);
 
   const currentUser = currentLoginUser;
-  const selectedTeacher = users.find((u) => u.id === selectedTeacherFolderId) || sortedTeachers[0];
-  const teacherClasses = classes.filter((item) => item.teacherId === currentUser.id);
-  const folderClasses = classes.filter((item) => item.teacherId === selectedTeacherFolderId);
+  const selectedTeacher = teacherUsers.find((u) => u.id === selectedTeacherFolderId) || teacherUsers[0];
+  const teacherClasses = assembledClasses.filter((item) => item.teacherId === currentUser?.id);
+  const folderClasses = assembledClasses.filter((item) => item.teacherId === selectedTeacher?.id);
   const groupedFolderClasses = groupByDay(folderClasses);
-  const teacherHasOpenClass = teacherClasses.some((item) => item.status === 'open');
-  const monthRows = financialByMonth[selectedMonth] || [];
+  const teacherHasOpenClass = teacherClasses.some((item) => classUiStatus[item.id] === 'open');
 
   const teacherStudents = useMemo(() => {
-    const unique = new Map<string, Student & { turma: string; horario: string }>();
+    const unique = new Map<string, StudentCard & { turma: string; horario: string }>();
     teacherClasses.forEach((item) => {
       item.students.forEach((student) => {
         if (!unique.has(student.id)) {
@@ -389,37 +570,39 @@ export default function Home() {
 
   const teacherFinancialMirror = useMemo(() => {
     return monthRows
-      .filter((row) => row.teacher === currentUser.name)
+      .filter((row) => row.teacher === currentUser?.name)
       .map((row) => {
-        const received = parseMoney(row.received);
-        const rate = teacherRates[row.teacher] || 0;
+        const professor = dbProfessores.find((p) => p.id === row.professorId);
+        const rate = professor?.percentual || 0;
         return {
           ...row,
-          teacherValue: received * rate,
+          teacherValue: row.received ? row.value * rate : 0,
         };
-      })
-      .sort((a, b) => a.student.localeCompare(b.student, 'pt-BR'));
-  }, [monthRows, currentUser.name]);
+      });
+  }, [monthRows, currentUser, dbProfessores]);
 
-  const teacherMonthlyValue = useMemo(() => {
-    return teacherFinancialMirror.reduce((acc, row) => acc + row.teacherValue, 0);
-  }, [teacherFinancialMirror]);
+  const teacherMonthlyValue = useMemo(
+    () => teacherFinancialMirror.reduce((acc, row) => acc + row.teacherValue, 0),
+    [teacherFinancialMirror]
+  );
 
   const financialSummary = useMemo(() => {
     return monthRows.reduce(
       (acc, row) => {
-        const received = parseMoney(row.received);
-        const rate = teacherRates[row.teacher] || 0;
-        acc.teacher += received * rate;
-        acc.arena += received * (1 - rate);
+        const professor = dbProfessores.find((p) => p.id === row.professorId);
+        const rate = professor?.percentual || 0;
+        if (row.received) {
+          acc.teacher += row.value * rate;
+          acc.arena += row.value * (1 - rate);
+        }
         return acc;
       },
       { teacher: 0, arena: 0 }
     );
-  }, [monthRows]);
+  }, [monthRows, dbProfessores]);
 
   const sharedStudentsForSelectedTeacher = useMemo(() => {
-    const map = new Map<string, Student & { turma: string; horario: string; quadra: string }>();
+    const map = new Map<string, StudentCard & { turma: string; horario: string; quadra: string }>();
     folderClasses.forEach((item) => {
       item.students.forEach((student) => {
         if (!map.has(student.id)) {
@@ -436,18 +619,24 @@ export default function Home() {
   }, [folderClasses]);
 
   const metrics = useMemo(() => {
-    const openClasses = classes.filter((item) => item.status === 'open').length;
-    const overdue = monthRows.filter((row) => row.notReceived.trim() !== '').length;
+    const openClasses = Object.values(classUiStatus).filter((status) => status === 'open').length;
+    const overdue = monthRows.filter((row) => !row.received).length;
+
     return {
-      openClasses: `${openClasses}/${classes.length}`,
-      experimentals: String(experimentals.length),
+      openClasses: `${openClasses}/${assembledClasses.length}`,
+      experimentals: String(experimentalsView.length),
       overdue: String(overdue),
       teacherTotal: formatCurrency(financialSummary.teacher),
       arenaTotal: formatCurrency(financialSummary.arena),
     };
-  }, [classes, experimentals.length, monthRows, financialSummary.teacher, financialSummary.arena]);
+  }, [classUiStatus, monthRows, assembledClasses.length, experimentalsView.length, financialSummary]);
 
-  function handleLogin() {
+  async function handleLogin() {
+    if (!currentLoginUser) {
+      setPinError('Carregando usuários.');
+      return;
+    }
+
     if (pin === currentLoginUser.pin) {
       setPin('');
       setPinError('');
@@ -456,6 +645,7 @@ export default function Home() {
       if (currentLoginUser.role === 'admin') setScreen('admin');
       return;
     }
+
     setPinError('PIN inválido.');
   }
 
@@ -467,74 +657,100 @@ export default function Home() {
   }
 
   function openClass(classId: string) {
-    setClasses((current) => {
-      const target = current.find((item) => item.id === classId);
-      if (!target) return current;
-      const sameTeacherOpen = current.some(
-        (item) => item.teacherId === target.teacherId && item.status === 'open' && item.id !== classId
-      );
-      if (sameTeacherOpen) return current;
-      return current.map((item) => (item.id === classId ? { ...item, status: 'open' } : item));
-    });
+    const classItem = teacherClasses.find((item) => item.id === classId);
+    if (!classItem) return;
+
+    const sameTeacherOpen = teacherClasses.some((item) => item.id !== classId && classUiStatus[item.id] === 'open');
+    if (sameTeacherOpen) return;
+
+    setClassUiStatus((current) => ({ ...current, [classId]: 'open' }));
   }
 
   function closeClass(classId: string) {
-    setClasses((current) =>
-      current.map((item) => (item.id === classId ? { ...item, status: 'closed' } : item))
-    );
+    setClassUiStatus((current) => ({ ...current, [classId]: 'closed' }));
   }
 
-  function togglePresence(classId: string, studentId: string) {
-    setClasses((current) =>
-      current.map((item) => {
-        if (item.id !== classId || item.status !== 'open') return item;
-        return {
-          ...item,
-          students: item.students.map((student) =>
-            student.id === studentId ? { ...student, present: !student.present } : student
-          ),
-        };
-      })
-    );
+  async function togglePresence(classId: string, studentId: string) {
+    const alreadyPresent = attendanceSet.has(`${classId}_${studentId}`);
+
+    if (alreadyPresent) {
+      const { data: existing } = await supabase
+        .from('presencas')
+        .select('id')
+        .eq('turma_id', classId)
+        .eq('aluno_id', studentId)
+        .gte('data', new Date(new Date().setHours(0, 0, 0, 0)).toISOString())
+        .lte('data', new Date(new Date().setHours(23, 59, 59, 999)).toISOString());
+
+      if (existing && existing.length > 0) {
+        await supabase.from('presencas').delete().in('id', existing.map((item: { id: string }) => item.id));
+      }
+    } else {
+      await supabase.from('presencas').insert({
+        turma_id: classId,
+        aluno_id: studentId,
+        data: new Date().toISOString(),
+      });
+    }
+
+    await loadAllData();
   }
 
-  function updateClassField(classId: string, field: keyof ClassItem, value: string) {
-    setClasses((current) =>
-      current.map((item) => (item.id === classId ? { ...item, [field]: value } : item))
-    );
+  async function updateClassField(classId: string, field: 'categoria' | 'quadra', value: string) {
+    const update: Record<string, string> = {};
+    update[field] = value;
+
+    const { error } = await supabase.from('turmas').update(update).eq('id', classId);
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    await loadAllData();
   }
 
-  function updateFinancialField(rowId: string, field: keyof FinancialRow, value: string) {
-    setFinancialByMonth((current) => ({
-      ...current,
-      [selectedMonth]: (current[selectedMonth] || []).map((row) =>
-        row.id === rowId ? { ...row, [field]: value } : row
-      ),
-    }));
+  async function updateFinancialRow(
+    rowId: string,
+    changes: Partial<{
+      aluno_id: string | null;
+      professor_id: string | null;
+      valor: number;
+      recebido: boolean;
+      forma_pagamento: string;
+      mes: string;
+    }>
+  ) {
+    const { error } = await supabase.from('financeiro').update(changes).eq('id', rowId);
+    if (error) {
+      console.error(error);
+      return;
+    }
+    await loadAllData();
   }
 
-  function addFinancialRow() {
-    setFinancialByMonth((current) => ({
-      ...current,
-      [selectedMonth]: [
-        ...(current[selectedMonth] || []),
-        {
-          id: `f-${Date.now()}`,
-          student: '',
-          notReceived: '',
-          received: '',
-          paymentMethod: '',
-          teacher: selectedTeacher.name,
-        },
-      ],
-    }));
+  async function addFinancialRow() {
+    const professorId = selectedTeacher?.id || dbProfessores[0]?.id || null;
+    const { error } = await supabase.from('financeiro').insert({
+      aluno_id: null,
+      professor_id: professorId,
+      valor: 0,
+      recebido: false,
+      forma_pagamento: '',
+      mes: selectedMonth,
+    });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    await loadAllData();
   }
 
-  function createMonth() {
-    const name = `NOVO MÊS ${Object.keys(financialByMonth).length - 2}`;
-    if (financialByMonth[name]) return;
-    setFinancialByMonth((current) => ({ ...current, [name]: [] }));
-    setSelectedMonth(name);
+  async function createMonth() {
+    const name = window.prompt('Digite o nome do novo mês (ex: ABRIL)');
+    if (!name) return;
+    setSelectedMonth(name.toUpperCase());
   }
 
   function renderHeader(title: string, subtitle: string, badge: string) {
@@ -547,13 +763,13 @@ export default function Home() {
         </div>
 
         <div className="header-user">
-          <div className="avatar-circle">{currentUser.initials}</div>
+          <div className="avatar-circle">{currentUser?.initials || 'CT'}</div>
           <div>
-            <div className="header-user-name">{currentUser.name}</div>
+            <div className="header-user-name">{currentUser?.name || 'Conexão CT'}</div>
             <div className="header-user-role">
-              {currentUser.role === 'teacher'
+              {currentUser?.role === 'teacher'
                 ? 'Professor'
-                : currentUser.role === 'reception'
+                : currentUser?.role === 'reception'
                   ? 'Recepção'
                   : 'Administração'}
             </div>
@@ -982,6 +1198,24 @@ export default function Home() {
     `}</style>
   );
 
+  if (loading) {
+    return (
+      <>
+        {globalStyles}
+        <main className="page-root">
+          <div className="panel-wrap">
+            <div className="panel-card" style={{ padding: 32, textAlign: 'center' }}>
+              <div className="summary-value" style={{ fontSize: 28 }}>Carregando dados...</div>
+              <div className="panel-subtitle" style={{ marginTop: 10 }}>
+                Conectando o Gestor Conexão ao Supabase.
+              </div>
+            </div>
+          </div>
+        </main>
+      </>
+    );
+  }
+
   if (screen === 'login') {
     return (
       <>
@@ -1026,7 +1260,7 @@ export default function Home() {
                     className={`chip-btn ${loginTab === 'admin' ? 'active' : ''}`}
                     onClick={() => {
                       setLoginTab('admin');
-                      setSelectedRoleUserId('a1');
+                      setSelectedRoleUserId(FIXED_ACCESS.admin.id);
                     }}
                   >
                     ADMIN
@@ -1043,7 +1277,7 @@ export default function Home() {
                     className={`chip-btn ${loginTab === 'reception' ? 'active' : ''}`}
                     onClick={() => {
                       setLoginTab('reception');
-                      setSelectedRoleUserId('r1');
+                      setSelectedRoleUserId(FIXED_ACCESS.reception.id);
                     }}
                   >
                     RECEPÇÃO
@@ -1052,7 +1286,7 @@ export default function Home() {
 
                 <div className="profile-grid">
                   {loginTab === 'teachers'
-                    ? sortedTeachers.map((user) => {
+                    ? teacherUsers.map((user) => {
                         const active = user.id === selectedTeacherIdForLogin;
                         return (
                           <button
@@ -1145,7 +1379,7 @@ export default function Home() {
                   const filteredStudents = item.students.filter((student) =>
                     student.name.toLowerCase().includes(classSearch.toLowerCase())
                   );
-                  const disableOpen = teacherHasOpenClass && item.status !== 'open';
+                  const disableOpen = teacherHasOpenClass && classUiStatus[item.id] !== 'open';
 
                   return (
                     <div key={item.id} className="panel-card">
@@ -1168,11 +1402,11 @@ export default function Home() {
                           <button
                             className="chip-btn"
                             onClick={() => openClass(item.id)}
-                            disabled={disableOpen || item.status === 'open'}
+                            disabled={disableOpen || classUiStatus[item.id] === 'open'}
                             style={{
-                              background: disableOpen || item.status === 'open' ? '#CBD5E1' : COLORS.blue,
+                              background: disableOpen || classUiStatus[item.id] === 'open' ? '#CBD5E1' : COLORS.blue,
                               color: '#fff',
-                              borderColor: disableOpen || item.status === 'open' ? '#CBD5E1' : COLORS.blue,
+                              borderColor: disableOpen || classUiStatus[item.id] === 'open' ? '#CBD5E1' : COLORS.blue,
                             }}
                           >
                             Abrir turma
@@ -1180,10 +1414,10 @@ export default function Home() {
                           <button
                             className="chip-btn"
                             onClick={() => closeClass(item.id)}
-                            disabled={item.status !== 'open'}
+                            disabled={classUiStatus[item.id] !== 'open'}
                             style={{
-                              color: item.status === 'open' ? COLORS.green : '#94A3B8',
-                              borderColor: item.status === 'open' ? COLORS.green : COLORS.border,
+                              color: classUiStatus[item.id] === 'open' ? COLORS.green : '#94A3B8',
+                              borderColor: classUiStatus[item.id] === 'open' ? COLORS.green : COLORS.border,
                             }}
                           >
                             Encerrar turma
@@ -1206,8 +1440,8 @@ export default function Home() {
                               <button
                                 key={student.id}
                                 onClick={() => togglePresence(item.id, student.id)}
-                                disabled={item.status !== 'open'}
-                                className={`presence-card ${student.present ? 'present' : ''} ${item.status !== 'open' ? 'disabled' : ''}`}
+                                disabled={classUiStatus[item.id] !== 'open'}
+                                className={`presence-card ${student.present ? 'present' : ''} ${classUiStatus[item.id] !== 'open' ? 'disabled' : ''}`}
                               >
                                 <div style={{ display: 'flex', justifyContent: 'space-between', gap: 10, alignItems: 'flex-start' }}>
                                   <div>
@@ -1309,8 +1543,8 @@ export default function Home() {
                           teacherFinancialMirror.map((row) => (
                             <tr key={row.id}>
                               <td><strong>{row.student}</strong></td>
-                              <td>{row.notReceived || '-'}</td>
-                              <td>{row.received || '-'}</td>
+                              <td>{row.received ? '-' : formatCurrency(row.value)}</td>
+                              <td>{row.received ? formatCurrency(row.value) : '-'}</td>
                               <td>{row.paymentMethod || '-'}</td>
                               <td style={{ color: COLORS.blue, fontWeight: 700 }}>{formatCurrency(row.teacherValue)}</td>
                             </tr>
@@ -1357,7 +1591,7 @@ export default function Home() {
               </div>
               <div className="panel-card summary-card">
                 <div className="summary-label">Professores</div>
-                <div className="summary-value">{sortedTeachers.length}</div>
+                <div className="summary-value">{teacherUsers.length}</div>
               </div>
             </div>
 
@@ -1375,7 +1609,7 @@ export default function Home() {
                 <div>
                   <div style={{ marginBottom: 10, color: COLORS.muted, fontWeight: 700 }}>Professores</div>
                   <div className="teacher-folder-grid">
-                    {sortedTeachers.map((teacher) => {
+                    {teacherUsers.map((teacher) => {
                       const active = teacher.id === selectedTeacherFolderId;
                       return (
                         <button
@@ -1394,7 +1628,7 @@ export default function Home() {
                 </div>
 
                 <div className="section-gap">
-                  <div>{sectionTitle(`Turmas · ${selectedTeacher.name}`)}</div>
+                  <div>{sectionTitle(`Turmas · ${selectedTeacher?.name || ''}`)}</div>
 
                   {groupedFolderClasses.map((group) => (
                     <div key={group.day}>
@@ -1419,7 +1653,7 @@ export default function Home() {
                                     <select
                                       className="field-select"
                                       value={item.category}
-                                      onChange={(e) => updateClassField(item.id, 'category', e.target.value)}
+                                      onChange={(e) => updateClassField(item.id, 'categoria', e.target.value)}
                                     >
                                       {(item.sport === 'Beach Tennis' ? categoryOptions.beach : categoryOptions.fute).map((option) => (
                                         <option key={option} value={option}>{option}</option>
@@ -1430,7 +1664,7 @@ export default function Home() {
                                     <input
                                       className="field-input"
                                       value={item.court}
-                                      onChange={(e) => updateClassField(item.id, 'court', e.target.value)}
+                                      onChange={(e) => updateClassField(item.id, 'quadra', e.target.value)}
                                       placeholder="A definir"
                                     />
                                   </td>
@@ -1446,7 +1680,7 @@ export default function Home() {
                   ))}
 
                   <div>
-                    {sectionTitle(`Lista de alunos · ${selectedTeacher.name}`)}
+                    {sectionTitle(`Lista de alunos · ${selectedTeacher?.name || ''}`)}
                     <div className="panel-card table-card" style={{ marginTop: 12 }}>
                       <div className="table-inner">
                         <table>
@@ -1522,7 +1756,7 @@ export default function Home() {
                         </tr>
                       </thead>
                       <tbody>
-                        {sortByName(experimentals).map((item) => (
+                        {experimentalsView.map((item) => (
                           <tr key={item.id}>
                             <td><strong>{item.name}</strong></td>
                             <td>{item.phone}</td>
@@ -1588,7 +1822,7 @@ export default function Home() {
               <div>
                 <div style={{ marginBottom: 10, color: COLORS.muted, fontWeight: 700 }}>Professores</div>
                 <div className="teacher-folder-grid">
-                  {sortedTeachers.map((teacher) => {
+                  {teacherUsers.map((teacher) => {
                     const active = teacher.id === selectedTeacherFolderId;
                     return (
                       <button
@@ -1608,7 +1842,7 @@ export default function Home() {
 
               {groupedFolderClasses.map((group) => (
                 <div key={group.day}>
-                  {sectionTitle(`${selectedTeacher.name} · ${group.day}`)}
+                  {sectionTitle(`${selectedTeacher?.name || ''} · ${group.day}`)}
                   <div className="panel-card table-card" style={{ marginTop: 12 }}>
                     <div className="table-inner">
                       <table>
@@ -1629,7 +1863,7 @@ export default function Home() {
                                 <select
                                   className="field-select"
                                   value={item.category}
-                                  onChange={(e) => updateClassField(item.id, 'category', e.target.value)}
+                                  onChange={(e) => updateClassField(item.id, 'categoria', e.target.value)}
                                 >
                                   {(item.sport === 'Beach Tennis' ? categoryOptions.beach : categoryOptions.fute).map((option) => (
                                     <option key={option} value={option}>{option}</option>
@@ -1640,7 +1874,7 @@ export default function Home() {
                                 <input
                                   className="field-input"
                                   value={item.court}
-                                  onChange={(e) => updateClassField(item.id, 'court', e.target.value)}
+                                  onChange={(e) => updateClassField(item.id, 'quadra', e.target.value)}
                                   placeholder="A definir"
                                 />
                               </td>
@@ -1687,7 +1921,7 @@ export default function Home() {
                       </tr>
                     </thead>
                     <tbody>
-                      {sortByName(experimentals).map((item) => (
+                      {experimentalsView.map((item) => (
                         <tr key={item.id}>
                           <td><strong>{item.name}</strong></td>
                           <td>{item.phone}</td>
@@ -1710,7 +1944,7 @@ export default function Home() {
               <div>{sectionTitle('Financeiro')}</div>
 
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
-                {Object.keys(financialByMonth).sort((a, b) => a.localeCompare(b, 'pt-BR')).map((month) => (
+                {availableMonths.map((month) => (
                   <button
                     key={month}
                     className={`chip-btn ${selectedMonth === month ? 'active' : ''}`}
@@ -1759,19 +1993,90 @@ export default function Home() {
                     </thead>
                     <tbody>
                       {monthRows.map((row) => {
-                        const received = parseMoney(row.received);
-                        const rate = teacherRates[row.teacher] || 0;
-                        const teacherValue = received * rate;
-                        const arenaValue = received * (1 - rate);
+                        const professor = dbProfessores.find((p) => p.id === row.professorId);
+                        const rate = professor?.percentual || 0;
+                        const teacherValue = row.received ? row.value * rate : 0;
+                        const arenaValue = row.received ? row.value * (1 - rate) : 0;
 
                         return (
                           <tr key={row.id}>
-                            <td><input className="field-input" value={row.student} onChange={(e) => updateFinancialField(row.id, 'student', e.target.value)} /></td>
-                            <td><input className="field-input" value={row.notReceived} onChange={(e) => updateFinancialField(row.id, 'notReceived', e.target.value)} /></td>
-                            <td><input className="field-input" value={row.received} onChange={(e) => updateFinancialField(row.id, 'received', e.target.value)} /></td>
-                            <td><input className="field-input" value={row.paymentMethod} onChange={(e) => updateFinancialField(row.id, 'paymentMethod', e.target.value)} /></td>
-                            <td style={{ color: COLORS.blue, fontWeight: 700 }}>{formatCurrency(teacherValue)}</td>
-                            <td style={{ color: COLORS.blue, fontWeight: 700 }}>{formatCurrency(arenaValue)}</td>
+                            <td style={{ minWidth: 220 }}>
+                              <select
+                                className="field-select"
+                                value={row.alunoId || ''}
+                                onChange={(e) =>
+                                  updateFinancialRow(row.id, {
+                                    aluno_id: e.target.value || null,
+                                  })
+                                }
+                              >
+                                <option value="">Selecione</option>
+                                {dbAlunos.map((aluno) => (
+                                  <option key={aluno.id} value={aluno.id}>
+                                    {aluno.nome}
+                                  </option>
+                                ))}
+                              </select>
+                            </td>
+                            <td style={{ minWidth: 140 }}>
+                              <input
+                                className="field-input"
+                                value={row.received ? '' : formatInputMoney(row.value)}
+                                onChange={(e) =>
+                                  updateFinancialRow(row.id, {
+                                    valor: parseBRL(e.target.value),
+                                    recebido: false,
+                                  })
+                                }
+                              />
+                            </td>
+                            <td style={{ minWidth: 140 }}>
+                              <input
+                                className="field-input"
+                                value={row.received ? formatInputMoney(row.value) : ''}
+                                onChange={(e) =>
+                                  updateFinancialRow(row.id, {
+                                    valor: parseBRL(e.target.value),
+                                    recebido: true,
+                                  })
+                                }
+                              />
+                            </td>
+                            <td style={{ minWidth: 180 }}>
+                              <input
+                                className="field-input"
+                                value={row.paymentMethod}
+                                onChange={(e) =>
+                                  updateFinancialRow(row.id, {
+                                    forma_pagamento: e.target.value,
+                                  })
+                                }
+                              />
+                            </td>
+                            <td style={{ minWidth: 220 }}>
+                              <select
+                                className="field-select"
+                                value={row.professorId || ''}
+                                onChange={(e) =>
+                                  updateFinancialRow(row.id, {
+                                    professor_id: e.target.value || null,
+                                  })
+                                }
+                              >
+                                <option value="">Selecione</option>
+                                {dbProfessores.map((professor) => (
+                                  <option key={professor.id} value={professor.id}>
+                                    {professor.nome}
+                                  </option>
+                                ))}
+                              </select>
+                              <div style={{ marginTop: 8, color: COLORS.blue, fontWeight: 700 }}>
+                                {formatCurrency(teacherValue)}
+                              </div>
+                            </td>
+                            <td style={{ color: COLORS.blue, fontWeight: 700 }}>
+                              {formatCurrency(arenaValue)}
+                            </td>
                           </tr>
                         );
                       })}
