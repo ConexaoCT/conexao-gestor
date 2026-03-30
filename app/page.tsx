@@ -178,6 +178,33 @@ const FIXED_ACCESS = {
   reception: { id: 'reception-fixed', name: 'Recepção CT', pin: '5555', role: 'reception' as const },
 };
 
+const FIXED_TEACHER_ACCESS = [
+  {
+    fallbackId: 'teacher-hugo',
+    name: 'Hugo Leonardo',
+    pin: '1111',
+    sport: 'Beach Tennis' as const,
+  },
+  {
+    fallbackId: 'teacher-zago',
+    name: 'Felipe Zago',
+    pin: '2222',
+    sport: 'Beach Tennis' as const,
+  },
+  {
+    fallbackId: 'teacher-rudi',
+    name: 'Rudiery',
+    pin: '3333',
+    sport: 'Beach Tennis' as const,
+  },
+  {
+    fallbackId: 'teacher-joao',
+    name: 'João José',
+    pin: '4444',
+    sport: 'Futevôlei' as const,
+  },
+];
+
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
@@ -236,15 +263,6 @@ function initialsFromName(name: string) {
     .join('');
 }
 
-function cardStyle(): React.CSSProperties {
-  return {
-    background: '#fff',
-    border: `1px solid ${COLORS.border}`,
-    borderRadius: 24,
-    boxShadow: '0 8px 24px rgba(15,23,42,0.05)',
-  };
-}
-
 function studentTagStyle(tag?: StudentCard['tag']): React.CSSProperties {
   const base: React.CSSProperties = {
     borderRadius: 999,
@@ -277,18 +295,6 @@ function sectionTitle(text: string) {
   );
 }
 
-function inputStyle(): React.CSSProperties {
-  return {
-    width: '100%',
-    height: 38,
-    borderRadius: 10,
-    border: `1px solid ${COLORS.border}`,
-    padding: '0 10px',
-    fontSize: 14,
-    background: '#fff',
-  };
-}
-
 export default function Home() {
   const [loading, setLoading] = useState(true);
   const [screen, setScreen] = useState<'login' | 'teacher' | 'reception' | 'admin'>('login');
@@ -304,6 +310,7 @@ export default function Home() {
   const [selectedTeacherFolderId, setSelectedTeacherFolderId] = useState('');
   const [selectedMonth, setSelectedMonth] = useState('MARÇO');
   const [classUiStatus, setClassUiStatus] = useState<Record<string, ClassStatus>>({});
+  const [dbErrors, setDbErrors] = useState<string[]>([]);
 
   const [dbProfessores, setDbProfessores] = useState<DbProfessor[]>([]);
   const [dbAlunos, setDbAlunos] = useState<DbAluno[]>([]);
@@ -315,6 +322,7 @@ export default function Home() {
 
   async function loadAllData() {
     setLoading(true);
+    setDbErrors([]);
 
     const todayStart = new Date();
     todayStart.setHours(0, 0, 0, 0);
@@ -344,13 +352,16 @@ export default function Home() {
       supabase.from('experimentais').select('*'),
     ]);
 
-    if (profRes.error) console.error(profRes.error);
-    if (alunosRes.error) console.error(alunosRes.error);
-    if (turmasRes.error) console.error(turmasRes.error);
-    if (turmaAlunosRes.error) console.error(turmaAlunosRes.error);
-    if (presencasRes.error) console.error(presencasRes.error);
-    if (financeiroRes.error) console.error(financeiroRes.error);
-    if (experimentaisRes.error) console.error(experimentaisRes.error);
+    const errors: string[] = [];
+    if (profRes.error) errors.push(`professores: ${profRes.error.message}`);
+    if (alunosRes.error) errors.push(`alunos: ${alunosRes.error.message}`);
+    if (turmasRes.error) errors.push(`turmas: ${turmasRes.error.message}`);
+    if (turmaAlunosRes.error) errors.push(`turma_alunos: ${turmaAlunosRes.error.message}`);
+    if (presencasRes.error) errors.push(`presencas: ${presencasRes.error.message}`);
+    if (financeiroRes.error) errors.push(`financeiro: ${financeiroRes.error.message}`);
+    if (experimentaisRes.error) errors.push(`experimentais: ${experimentaisRes.error.message}`);
+
+    setDbErrors(errors);
 
     setDbProfessores((profRes.data || []) as DbProfessor[]);
     setDbAlunos((alunosRes.data || []) as DbAluno[]);
@@ -368,22 +379,19 @@ export default function Home() {
   }, []);
 
   const teacherUsers: LoginUser[] = useMemo(() => {
-    const pinMap: Record<string, string> = {
-      'Hugo Leonardo': '1111',
-      'Felipe Zago': '2222',
-      Rudiery: '3333',
-      'João José': '4444',
-    };
-
     return sortByName(
-      dbProfessores.map((prof) => ({
-        id: prof.id,
-        name: prof.nome,
-        initials: initialsFromName(prof.nome),
-        pin: pinMap[prof.nome] || '0000',
-        role: 'teacher' as const,
-        sport: teacherSport(prof.nome),
-      }))
+      FIXED_TEACHER_ACCESS.map((teacher) => {
+        const professorFromDb = dbProfessores.find((prof) => prof.nome === teacher.name);
+
+        return {
+          id: professorFromDb?.id || teacher.fallbackId,
+          name: teacher.name,
+          initials: initialsFromName(teacher.name),
+          pin: teacher.pin,
+          role: 'teacher' as const,
+          sport: teacher.sport,
+        };
+      })
     );
   }, [dbProfessores]);
 
@@ -657,12 +665,8 @@ export default function Home() {
   }
 
   function openClass(classId: string) {
-    const classItem = teacherClasses.find((item) => item.id === classId);
-    if (!classItem) return;
-
     const sameTeacherOpen = teacherClasses.some((item) => item.id !== classId && classUiStatus[item.id] === 'open');
     if (sameTeacherOpen) return;
-
     setClassUiStatus((current) => ({ ...current, [classId]: 'open' }));
   }
 
@@ -1164,6 +1168,16 @@ export default function Home() {
         color: ${COLORS.muted};
         border: 1px solid ${COLORS.border};
       }
+      .debug-box {
+        margin-top: 14px;
+        padding: 12px;
+        border-radius: 14px;
+        background: #fff7ed;
+        border: 1px solid #fed7aa;
+        color: #9a3412;
+        font-size: 13px;
+        line-height: 1.45;
+      }
       @media (min-width: 768px) {
         .login-wrap {
           grid-template-columns: 1fr 1fr;
@@ -1284,6 +1298,12 @@ export default function Home() {
                   </button>
                 </div>
 
+                {loginTab === 'teachers' ? (
+                  <div style={{ marginBottom: 12, color: '#64748B', fontSize: 14 }}>
+                    Professores carregados: {teacherUsers.length}
+                  </div>
+                ) : null}
+
                 <div className="profile-grid">
                   {loginTab === 'teachers'
                     ? teacherUsers.map((user) => {
@@ -1327,6 +1347,13 @@ export default function Home() {
                           );
                         })}
                 </div>
+
+                {dbErrors.length > 0 ? (
+                  <div className="debug-box">
+                    <strong>Diagnóstico do banco:</strong>
+                    <div style={{ marginTop: 6 }}>{dbErrors.join(' | ')}</div>
+                  </div>
+                ) : null}
 
                 <div className="pin-label">PIN de acesso</div>
                 <input
