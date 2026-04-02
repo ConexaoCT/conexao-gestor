@@ -8,8 +8,8 @@ type ClassStatus = 'open' | 'upcoming' | 'closed';
 type Sport = 'Beach Tennis' | 'Futevôlei';
 type LoginTab = 'admin' | 'teachers' | 'reception';
 type TeacherTab = 'today' | 'space';
-type ReceptionTab = 'classes' | 'registrations';
-type AdminTab = 'classes' | 'registrations' | 'financial';
+type ReceptionTab = 'classes' | 'registrations' | 'experimentals';
+type AdminTab = 'classes' | 'registrations' | 'financial' | 'experimentals';
 
 type LoginUser = {
   id: string;
@@ -113,6 +113,7 @@ type ExperimentalCard = {
   modality: string;
   category: string;
   teacher: string;
+  teacherId: string;
   scheduledDate: string;
   scheduledTime: string;
   notes: string;
@@ -179,31 +180,22 @@ const FIXED_ACCESS = {
 };
 
 const FIXED_TEACHER_ACCESS = [
-  {
-    fallbackId: 'teacher-hugo',
-    name: 'Hugo Leonardo',
-    pin: '1111',
-    sport: 'Beach Tennis' as const,
-  },
-  {
-    fallbackId: 'teacher-zago',
-    name: 'Felipe Zago',
-    pin: '2222',
-    sport: 'Beach Tennis' as const,
-  },
-  {
-    fallbackId: 'teacher-rudi',
-    name: 'Rudiery',
-    pin: '3333',
-    sport: 'Beach Tennis' as const,
-  },
-  {
-    fallbackId: 'teacher-joao',
-    name: 'João José',
-    pin: '4444',
-    sport: 'Futevôlei' as const,
-  },
+  { fallbackId: 'teacher-hugo', name: 'Hugo Leonardo', pin: '1111', sport: 'Beach Tennis' as const },
+  { fallbackId: 'teacher-zago', name: 'Felipe Zago', pin: '2222', sport: 'Beach Tennis' as const },
+  { fallbackId: 'teacher-rudi', name: 'Rudiery', pin: '3333', sport: 'Beach Tennis' as const },
+  { fallbackId: 'teacher-joao', name: 'João José', pin: '4444', sport: 'Futevôlei' as const },
 ];
+
+const initialExperimentalForm = {
+  nome: '',
+  telefone: '',
+  modalidade: 'Beach Tennis',
+  categoria: '',
+  professor_id: '',
+  data_agendada: '',
+  horario_agendado: '',
+  observacoes: '',
+};
 
 function formatCurrency(value: number) {
   return new Intl.NumberFormat('pt-BR', {
@@ -311,6 +303,10 @@ export default function Home() {
   const [selectedMonth, setSelectedMonth] = useState('MARÇO');
   const [classUiStatus, setClassUiStatus] = useState<Record<string, ClassStatus>>({});
   const [dbErrors, setDbErrors] = useState<string[]>([]);
+  const [saveMessage, setSaveMessage] = useState('');
+  const [savingExperimental, setSavingExperimental] = useState(false);
+
+  const [experimentalForm, setExperimentalForm] = useState(initialExperimentalForm);
 
   const [dbProfessores, setDbProfessores] = useState<DbProfessor[]>([]);
   const [dbAlunos, setDbAlunos] = useState<DbAluno[]>([]);
@@ -349,7 +345,7 @@ export default function Home() {
         .gte('data', todayStart.toISOString())
         .lte('data', todayEnd.toISOString()),
       supabase.from('financeiro').select('*'),
-      supabase.from('experimentais').select('*'),
+      supabase.from('experimentais').select('*').order('nome'),
     ]);
 
     const errors: string[] = [];
@@ -362,7 +358,6 @@ export default function Home() {
     if (experimentaisRes.error) errors.push(`experimentais: ${experimentaisRes.error.message}`);
 
     setDbErrors(errors);
-
     setDbProfessores((profRes.data || []) as DbProfessor[]);
     setDbAlunos((alunosRes.data || []) as DbAluno[]);
     setDbTurmas((turmasRes.data || []) as DbTurma[]);
@@ -402,7 +397,10 @@ export default function Home() {
     if (!selectedTeacherFolderId && teacherUsers.length > 0) {
       setSelectedTeacherFolderId(teacherUsers[0].id);
     }
-  }, [teacherUsers, selectedTeacherIdForLogin, selectedTeacherFolderId]);
+    if (!experimentalForm.professor_id && teacherUsers.length > 0) {
+      setExperimentalForm((current) => ({ ...current, professor_id: teacherUsers[0].id }));
+    }
+  }, [teacherUsers, selectedTeacherIdForLogin, selectedTeacherFolderId, experimentalForm.professor_id]);
 
   useEffect(() => {
     if (Object.keys(classUiStatus).length === 0 && dbTurmas.length > 0) {
@@ -510,6 +508,7 @@ export default function Home() {
           modality: item.modalidade || '',
           category: item.categoria || '',
           teacher: professor?.nome || 'Sem professor',
+          teacherId: item.professor_id || '',
           scheduledDate: item.data_agendada || '',
           scheduledTime: item.horario_agendado || '',
           notes: item.observacoes || '',
@@ -636,8 +635,9 @@ export default function Home() {
       overdue: String(overdue),
       teacherTotal: formatCurrency(financialSummary.teacher),
       arenaTotal: formatCurrency(financialSummary.arena),
+      enrolledStudents: String(dbAlunos.length),
     };
-  }, [classUiStatus, monthRows, assembledClasses.length, experimentalsView.length, financialSummary]);
+  }, [classUiStatus, monthRows, assembledClasses.length, experimentalsView.length, financialSummary, dbAlunos.length]);
 
   async function handleLogin() {
     if (!currentLoginUser) {
@@ -648,6 +648,7 @@ export default function Home() {
     if (pin === currentLoginUser.pin) {
       setPin('');
       setPinError('');
+      setSaveMessage('');
       if (currentLoginUser.role === 'teacher') setScreen('teacher');
       if (currentLoginUser.role === 'reception') setScreen('reception');
       if (currentLoginUser.role === 'admin') setScreen('admin');
@@ -662,6 +663,7 @@ export default function Home() {
     setPin('');
     setPinError('');
     setClassSearch('');
+    setSaveMessage('');
   }
 
   function openClass(classId: string) {
@@ -757,6 +759,81 @@ export default function Home() {
     setSelectedMonth(name.toUpperCase());
   }
 
+  function updateExperimentalField(field: keyof typeof initialExperimentalForm, value: string) {
+    setExperimentalForm((current) => ({ ...current, [field]: value }));
+  }
+
+  async function handleSaveExperimental() {
+    setSaveMessage('');
+
+    if (!experimentalForm.nome.trim()) {
+      setSaveMessage('Preencha o nome do aluno experimental.');
+      return;
+    }
+
+    if (!experimentalForm.telefone.trim()) {
+      setSaveMessage('Preencha o telefone do aluno experimental.');
+      return;
+    }
+
+    setSavingExperimental(true);
+
+    const payload = {
+      nome: experimentalForm.nome.trim(),
+      telefone: experimentalForm.telefone.trim(),
+      modalidade: experimentalForm.modalidade,
+      categoria: experimentalForm.categoria.trim() || null,
+      professor_id: experimentalForm.professor_id || null,
+      data_agendada: experimentalForm.data_agendada || null,
+      horario_agendado: experimentalForm.horario_agendado || null,
+      observacoes: experimentalForm.observacoes.trim() || null,
+    };
+
+    const { error } = await supabase.from('experimentais').insert(payload);
+
+    setSavingExperimental(false);
+
+    if (error) {
+      setSaveMessage(`Erro ao salvar experimental: ${error.message}`);
+      return;
+    }
+
+    setSaveMessage('Aluno experimental cadastrado com sucesso.');
+    setExperimentalForm({
+      ...initialExperimentalForm,
+      professor_id: experimentalForm.professor_id || teacherUsers[0]?.id || '',
+    });
+    await loadAllData();
+  }
+
+  async function convertExperimentalToAluno(item: ExperimentalCard) {
+    const confirmar = window.confirm(`Deseja transformar ${item.name} em aluno matriculado?`);
+    if (!confirmar) return;
+
+    const { error: insertError } = await supabase.from('alunos').insert({
+      nome: item.name,
+      telefone: item.phone || null,
+      status: 'ativo',
+      tipo: 'fixo',
+    });
+
+    if (insertError) {
+      setSaveMessage(`Erro ao matricular: ${insertError.message}`);
+      return;
+    }
+
+    const { error: deleteError } = await supabase.from('experimentais').delete().eq('id', item.id);
+
+    if (deleteError) {
+      setSaveMessage(`Aluno criado, mas houve erro ao remover da lista de experimentais: ${deleteError.message}`);
+      await loadAllData();
+      return;
+    }
+
+    setSaveMessage(`${item.name} foi movido para a lista de alunos matriculados.`);
+    await loadAllData();
+  }
+
   function renderHeader(title: string, subtitle: string, badge: string) {
     return (
       <div className="panel-card panel-header">
@@ -781,6 +858,218 @@ export default function Home() {
           <button className="ghost-btn" onClick={logout}>
             Sair
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  function renderExperimentalSection(showConvertButton: boolean) {
+    return (
+      <div className="section-gap">
+        <div className="summary-grid">
+          <div className="panel-card summary-card">
+            <div className="summary-label">Experimentais cadastrados</div>
+            <div className="summary-value">{metrics.experimentals}</div>
+          </div>
+          <div className="panel-card summary-card">
+            <div className="summary-label">Alunos matriculados</div>
+            <div className="summary-value">{metrics.enrolledStudents}</div>
+          </div>
+          <div className="panel-card summary-card">
+            <div className="summary-label">Professores</div>
+            <div className="summary-value">{teacherUsers.length}</div>
+          </div>
+        </div>
+
+        <div className="panel-card" style={{ padding: 20 }}>
+          <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16, fontSize: 20 }}>
+            Cadastro de aula experimental
+          </div>
+
+          <div className="form-grid">
+            <div className="form-block">
+              <label className="form-label">Nome</label>
+              <input
+                className="field-input"
+                value={experimentalForm.nome}
+                onChange={(e) => updateExperimentalField('nome', e.target.value)}
+                placeholder="Nome do aluno experimental"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Telefone</label>
+              <input
+                className="field-input"
+                value={experimentalForm.telefone}
+                onChange={(e) => updateExperimentalField('telefone', e.target.value)}
+                placeholder="Telefone"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Modalidade</label>
+              <select
+                className="field-select"
+                value={experimentalForm.modalidade}
+                onChange={(e) => updateExperimentalField('modalidade', e.target.value)}
+              >
+                <option value="Beach Tennis">Beach Tennis</option>
+                <option value="Futevôlei">Futevôlei</option>
+              </select>
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Categoria</label>
+              <input
+                className="field-input"
+                value={experimentalForm.categoria}
+                onChange={(e) => updateExperimentalField('categoria', e.target.value)}
+                placeholder="Categoria"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Professor</label>
+              <select
+                className="field-select"
+                value={experimentalForm.professor_id}
+                onChange={(e) => updateExperimentalField('professor_id', e.target.value)}
+              >
+                {teacherUsers.map((teacher) => (
+                  <option key={teacher.id} value={teacher.id}>
+                    {teacher.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Data agendada</label>
+              <input
+                type="date"
+                className="field-input"
+                value={experimentalForm.data_agendada}
+                onChange={(e) => updateExperimentalField('data_agendada', e.target.value)}
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Horário agendado</label>
+              <input
+                type="time"
+                className="field-input"
+                value={experimentalForm.horario_agendado}
+                onChange={(e) => updateExperimentalField('horario_agendado', e.target.value)}
+              />
+            </div>
+
+            <div className="form-block form-block-full">
+              <label className="form-label">Observações</label>
+              <textarea
+                className="field-textarea"
+                value={experimentalForm.observacoes}
+                onChange={(e) => updateExperimentalField('observacoes', e.target.value)}
+                placeholder="Observações sobre a aula experimental"
+              />
+            </div>
+          </div>
+
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+            <button className="primary-btn-inline" onClick={handleSaveExperimental} disabled={savingExperimental}>
+              {savingExperimental ? 'Salvando...' : 'Salvar experimental'}
+            </button>
+
+            {saveMessage ? (
+              <span style={{ color: saveMessage.includes('Erro') ? COLORS.red : COLORS.green, fontWeight: 700 }}>
+                {saveMessage}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="panel-card table-card">
+          <div className="table-header">Lista separada de alunos experimentais</div>
+          <div className="table-inner">
+            <table>
+              <thead>
+                <tr>
+                  <th>Nome</th>
+                  <th>Telefone</th>
+                  <th>Modalidade</th>
+                  <th>Categoria</th>
+                  <th>Professor</th>
+                  <th>Data</th>
+                  <th>Horário</th>
+                  <th>Observações</th>
+                  {showConvertButton ? <th>Ação</th> : null}
+                </tr>
+              </thead>
+              <tbody>
+                {experimentalsView.length > 0 ? (
+                  experimentalsView.map((item) => (
+                    <tr key={item.id}>
+                      <td><strong>{item.name}</strong></td>
+                      <td>{item.phone || '-'}</td>
+                      <td>{item.modality || '-'}</td>
+                      <td>{item.category || '-'}</td>
+                      <td>{item.teacher || '-'}</td>
+                      <td>{item.scheduledDate || '-'}</td>
+                      <td>{item.scheduledTime || '-'}</td>
+                      <td>{item.notes || '-'}</td>
+                      {showConvertButton ? (
+                        <td>
+                          <button className="chip-btn active" onClick={() => convertExperimentalToAluno(item)}>
+                            Matricular
+                          </button>
+                        </td>
+                      ) : null}
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={showConvertButton ? 9 : 8} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
+                      Nenhum aluno experimental cadastrado ainda.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <div className="panel-card table-card">
+          <div className="table-header">Lista de alunos matriculados</div>
+          <div className="table-inner">
+            <table>
+              <thead>
+                <tr>
+                  <th>Aluno</th>
+                  <th>Telefone</th>
+                  <th>Status</th>
+                  <th>Tipo</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dbAlunos.length > 0 ? (
+                  dbAlunos.map((aluno) => (
+                    <tr key={aluno.id}>
+                      <td><strong>{aluno.nome}</strong></td>
+                      <td>{aluno.telefone || '-'}</td>
+                      <td>{aluno.status || '-'}</td>
+                      <td>{aluno.tipo || '-'}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
+                      Nenhum aluno matriculado cadastrado ainda.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
     );
@@ -894,7 +1183,8 @@ export default function Home() {
       .tab-row,
       .profile-grid,
       .summary-grid,
-      .teacher-folder-grid {
+      .teacher-folder-grid,
+      .form-grid {
         display: grid;
         gap: 12px;
       }
@@ -911,6 +1201,22 @@ export default function Home() {
       }
       .teacher-folder-grid {
         grid-template-columns: 1fr;
+      }
+      .form-grid {
+        grid-template-columns: 1fr;
+      }
+      .form-block {
+        display: flex;
+        flex-direction: column;
+        gap: 8px;
+      }
+      .form-block-full {
+        grid-column: 1 / -1;
+      }
+      .form-label {
+        font-size: 14px;
+        font-weight: 700;
+        color: ${COLORS.muted};
       }
       .login-profile-btn,
       .folder-btn {
@@ -941,14 +1247,24 @@ export default function Home() {
       }
       .pin-input,
       .field-input,
-      .field-select {
+      .field-select,
+      .field-textarea {
         width: 100%;
-        height: 42px;
         border-radius: 12px;
         border: 1px solid ${COLORS.border};
         padding: 0 12px;
         font-size: 15px;
         background: #fff;
+      }
+      .pin-input,
+      .field-input,
+      .field-select {
+        height: 42px;
+      }
+      .field-textarea {
+        min-height: 110px;
+        padding: 12px;
+        resize: vertical;
       }
       .pin-error {
         margin-top: 10px;
@@ -966,6 +1282,17 @@ export default function Home() {
         font-weight: 700;
         cursor: pointer;
         margin-top: 12px;
+      }
+      .primary-btn-inline {
+        height: 46px;
+        border: none;
+        border-radius: 14px;
+        background: ${COLORS.blue};
+        color: #fff;
+        font-size: 15px;
+        font-weight: 700;
+        cursor: pointer;
+        padding: 0 18px;
       }
       .panel-wrap {
         max-width: 1280px;
@@ -1200,6 +1527,9 @@ export default function Home() {
         .presence-grid {
           grid-template-columns: repeat(2, 1fr);
         }
+        .form-grid {
+          grid-template-columns: repeat(2, 1fr);
+        }
       }
       @media (min-width: 1024px) {
         .teacher-folder-grid {
@@ -1281,9 +1611,7 @@ export default function Home() {
                   </button>
                   <button
                     className={`chip-btn ${loginTab === 'teachers' ? 'active' : ''}`}
-                    onClick={() => {
-                      setLoginTab('teachers');
-                    }}
+                    onClick={() => setLoginTab('teachers')}
                   >
                     PROFESSORES
                   </button>
@@ -1603,7 +1931,7 @@ export default function Home() {
           <div className="panel-wrap">
             {renderHeader(
               'Painel da recepção',
-              'Turmas, alunos e cadastros, sem acesso ao financeiro.',
+              'Turmas, alunos, cadastros e controle separado de experimentais.',
               'Gestor Conexão · Recepção'
             )}
 
@@ -1628,6 +1956,9 @@ export default function Home() {
               </button>
               <button className={`chip-btn ${receptionTab === 'registrations' ? 'active' : ''}`} onClick={() => setReceptionTab('registrations')}>
                 Cadastros
+              </button>
+              <button className={`chip-btn ${receptionTab === 'experimentals' ? 'active' : ''}`} onClick={() => setReceptionTab('experimentals')}>
+                Experimentais
               </button>
             </div>
 
@@ -1751,55 +2082,79 @@ export default function Home() {
                   </div>
                 </div>
               </>
-            ) : (
+            ) : null}
+
+            {receptionTab === 'registrations' ? (
               <div className="section-gap">
                 <div>{sectionTitle('Cadastros')}</div>
 
                 <div className="panel-card" style={{ padding: 20 }}>
-                  <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16 }}>Cadastro de alunos</div>
-                  <div className="summary-grid" style={{ gridTemplateColumns: '1fr', gap: 12 }}>
-                    <input className="field-input" placeholder="Nome do aluno" />
-                    <input className="field-input" placeholder="Telefone" />
-                    <input className="field-input" placeholder="CPF" />
-                    <input className="field-input" placeholder="Data de nascimento" />
-                    <input className="field-input" placeholder="Responsável (se menor)" />
-                    <input className="field-input" placeholder="Telefone do responsável" />
+                  <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16 }}>Cadastro de alunos matriculados</div>
+                  <div className="form-grid">
+                    <div className="form-block">
+                      <label className="form-label">Nome do aluno</label>
+                      <input className="field-input" placeholder="Nome do aluno" />
+                    </div>
+                    <div className="form-block">
+                      <label className="form-label">Telefone</label>
+                      <input className="field-input" placeholder="Telefone" />
+                    </div>
+                    <div className="form-block">
+                      <label className="form-label">CPF</label>
+                      <input className="field-input" placeholder="CPF" />
+                    </div>
+                    <div className="form-block">
+                      <label className="form-label">Data de nascimento</label>
+                      <input className="field-input" placeholder="Data de nascimento" />
+                    </div>
+                    <div className="form-block">
+                      <label className="form-label">Responsável</label>
+                      <input className="field-input" placeholder="Responsável (se menor)" />
+                    </div>
+                    <div className="form-block">
+                      <label className="form-label">Telefone do responsável</label>
+                      <input className="field-input" placeholder="Telefone do responsável" />
+                    </div>
                   </div>
                 </div>
 
                 <div className="panel-card table-card">
-                  <div className="table-header">Pasta · Aula experimental</div>
+                  <div className="table-header">Alunos já matriculados</div>
                   <div className="table-inner">
                     <table>
                       <thead>
                         <tr>
-                          <th>Nome</th>
+                          <th>Aluno</th>
                           <th>Telefone</th>
-                          <th>Modalidade</th>
-                          <th>Categoria</th>
-                          <th>Professor</th>
-                          <th>Agendamento</th>
-                          <th>Observações</th>
+                          <th>Status</th>
+                          <th>Tipo</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {experimentalsView.map((item) => (
-                          <tr key={item.id}>
-                            <td><strong>{item.name}</strong></td>
-                            <td>{item.phone}</td>
-                            <td>{item.modality}</td>
-                            <td>{item.category}</td>
-                            <td>{item.teacher}</td>
-                            <td>{item.scheduledDate} · {item.scheduledTime}</td>
-                            <td>{item.notes || '-'}</td>
+                        {dbAlunos.length > 0 ? (
+                          dbAlunos.map((aluno) => (
+                            <tr key={aluno.id}>
+                              <td><strong>{aluno.nome}</strong></td>
+                              <td>{aluno.telefone || '-'}</td>
+                              <td>{aluno.status || '-'}</td>
+                              <td>{aluno.tipo || '-'}</td>
+                            </tr>
+                          ))
+                        ) : (
+                          <tr>
+                            <td colSpan={4} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
+                              Nenhum aluno matriculado encontrado.
+                            </td>
                           </tr>
-                        ))}
+                        )}
                       </tbody>
                     </table>
                   </div>
                 </div>
               </div>
-            )}
+            ) : null}
+
+            {receptionTab === 'experimentals' ? renderExperimentalSection(false) : null}
           </div>
         </main>
       </>
@@ -1813,7 +2168,7 @@ export default function Home() {
         <div className="panel-wrap">
           {renderHeader(
             'Painel da administração',
-            'Gestão completa com turmas, cadastros e financeiro.',
+            'Gestão completa com turmas, cadastros, financeiro e experimentais.',
             'Gestor Conexão · Administração'
           )}
 
@@ -1841,6 +2196,9 @@ export default function Home() {
             </button>
             <button className={`chip-btn ${adminTab === 'registrations' ? 'active' : ''}`} onClick={() => setAdminTab('registrations')}>
               Cadastros
+            </button>
+            <button className={`chip-btn ${adminTab === 'experimentals' ? 'active' : ''}`} onClick={() => setAdminTab('experimentals')}>
+              Experimentais
             </button>
           </div>
 
@@ -1920,45 +2278,67 @@ export default function Home() {
 
           {adminTab === 'registrations' ? (
             <div className="section-gap">
+              <div>{sectionTitle('Cadastros')}</div>
+
               <div className="panel-card" style={{ padding: 20 }}>
-                <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16 }}>Cadastro de alunos</div>
-                <div className="summary-grid" style={{ gridTemplateColumns: '1fr', gap: 12 }}>
-                  <input className="field-input" placeholder="Nome do aluno" />
-                  <input className="field-input" placeholder="Telefone" />
-                  <input className="field-input" placeholder="CPF" />
-                  <input className="field-input" placeholder="Data de nascimento" />
-                  <input className="field-input" placeholder="Responsável (se menor)" />
-                  <input className="field-input" placeholder="Telefone do responsável" />
+                <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16 }}>Cadastro de alunos matriculados</div>
+                <div className="form-grid">
+                  <div className="form-block">
+                    <label className="form-label">Nome do aluno</label>
+                    <input className="field-input" placeholder="Nome do aluno" />
+                  </div>
+                  <div className="form-block">
+                    <label className="form-label">Telefone</label>
+                    <input className="field-input" placeholder="Telefone" />
+                  </div>
+                  <div className="form-block">
+                    <label className="form-label">CPF</label>
+                    <input className="field-input" placeholder="CPF" />
+                  </div>
+                  <div className="form-block">
+                    <label className="form-label">Data de nascimento</label>
+                    <input className="field-input" placeholder="Data de nascimento" />
+                  </div>
+                  <div className="form-block">
+                    <label className="form-label">Responsável</label>
+                    <input className="field-input" placeholder="Responsável (se menor)" />
+                  </div>
+                  <div className="form-block">
+                    <label className="form-label">Telefone do responsável</label>
+                    <input className="field-input" placeholder="Telefone do responsável" />
+                  </div>
                 </div>
               </div>
 
               <div className="panel-card table-card">
-                <div className="table-header">Pasta · Aula experimental</div>
+                <div className="table-header">Alunos já matriculados</div>
                 <div className="table-inner">
                   <table>
                     <thead>
                       <tr>
-                        <th>Nome</th>
+                        <th>Aluno</th>
                         <th>Telefone</th>
-                        <th>Modalidade</th>
-                        <th>Categoria</th>
-                        <th>Professor</th>
-                        <th>Agendamento</th>
-                        <th>Observações</th>
+                        <th>Status</th>
+                        <th>Tipo</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {experimentalsView.map((item) => (
-                        <tr key={item.id}>
-                          <td><strong>{item.name}</strong></td>
-                          <td>{item.phone}</td>
-                          <td>{item.modality}</td>
-                          <td>{item.category}</td>
-                          <td>{item.teacher}</td>
-                          <td>{item.scheduledDate} · {item.scheduledTime}</td>
-                          <td>{item.notes || '-'}</td>
+                      {dbAlunos.length > 0 ? (
+                        dbAlunos.map((aluno) => (
+                          <tr key={aluno.id}>
+                            <td><strong>{aluno.nome}</strong></td>
+                            <td>{aluno.telefone || '-'}</td>
+                            <td>{aluno.status || '-'}</td>
+                            <td>{aluno.tipo || '-'}</td>
+                          </tr>
+                        ))
+                      ) : (
+                        <tr>
+                          <td colSpan={4} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
+                            Nenhum aluno matriculado encontrado.
+                          </td>
                         </tr>
-                      ))}
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -2120,6 +2500,8 @@ export default function Home() {
               </div>
             </div>
           ) : null}
+
+          {adminTab === 'experimentals' ? renderExperimentalSection(true) : null}
         </div>
       </main>
     </>
