@@ -36,6 +36,15 @@ type DbAluno = {
   responsavel_nome: string | null;
   responsavel_telefone: string | null;
   tipo: string | null;
+  email?: string | null;
+  endereco?: string | null;
+  cep?: string | null;
+  data_inicio?: string | null;
+  menor_idade?: boolean | null;
+  responsavel_email?: string | null;
+  responsavel_cpf?: string | null;
+  responsavel_endereco?: string | null;
+  responsavel_cep?: string | null;
 };
 
 type DbTurma = {
@@ -81,6 +90,18 @@ type DbExperimental = {
   data_agendada: string | null;
   horario_agendado: string | null;
   observacoes: string | null;
+  dia_contato?: string | null;
+  professor_preferencia?: string | null;
+  dia_preferido?: string | null;
+  periodo_preferido?: string | null;
+  horario_pode_fazer?: string | null;
+  dia_horario_aula_experimental?: string | null;
+  fez_aula_experimental?: boolean | null;
+  entrou_em_contato_apos_aula?: boolean | null;
+  fechou_plano?: boolean | null;
+  motivo_nao_fechou?: string | null;
+  status_lead?: string | null;
+  follow_up?: string | null;
 };
 
 type StudentCard = {
@@ -117,6 +138,18 @@ type ExperimentalCard = {
   scheduledDate: string;
   scheduledTime: string;
   notes: string;
+  diaContato: string;
+  professorPreferencia: string;
+  diaPreferido: string;
+  periodoPreferido: string;
+  horarioPodeFazer: string;
+  diaHorarioAulaExperimental: string;
+  fezAulaExperimental: boolean;
+  entrouEmContatoAposAula: boolean;
+  fechouPlano: boolean;
+  motivoNaoFechou: string;
+  statusLead: string;
+  followUp: string;
 };
 
 type FinancialRowView = {
@@ -192,9 +225,39 @@ const initialExperimentalForm = {
   modalidade: 'Beach Tennis',
   categoria: '',
   professor_id: '',
+  dia_contato: '',
+  professor_preferencia: '',
+  dia_preferido: '',
+  periodo_preferido: '',
+  horario_pode_fazer: '',
+  dia_horario_aula_experimental: '',
+  fez_aula_experimental: 'nao',
+  entrou_em_contato_apos_aula: 'nao',
+  fechou_plano: 'nao',
+  motivo_nao_fechou: '',
+  status_lead: '',
+  follow_up: '',
   data_agendada: '',
   horario_agendado: '',
   observacoes: '',
+};
+
+const initialStudentForm = {
+  nome: '',
+  telefone: '',
+  email: '',
+  cpf: '',
+  data_nascimento: '',
+  endereco: '',
+  cep: '',
+  data_inicio: '',
+  menor_idade: false,
+  responsavel_nome: '',
+  responsavel_telefone: '',
+  responsavel_email: '',
+  responsavel_cpf: '',
+  responsavel_endereco: '',
+  responsavel_cep: '',
 };
 
 function formatCurrency(value: number) {
@@ -305,8 +368,11 @@ export default function Home() {
   const [dbErrors, setDbErrors] = useState<string[]>([]);
   const [saveMessage, setSaveMessage] = useState('');
   const [savingExperimental, setSavingExperimental] = useState(false);
+  const [savingStudent, setSavingStudent] = useState(false);
+  const [studentSaveMessage, setStudentSaveMessage] = useState('');
 
   const [experimentalForm, setExperimentalForm] = useState(initialExperimentalForm);
+  const [studentForm, setStudentForm] = useState(initialStudentForm);
 
   const [dbProfessores, setDbProfessores] = useState<DbProfessor[]>([]);
   const [dbAlunos, setDbAlunos] = useState<DbAluno[]>([]);
@@ -507,11 +573,23 @@ export default function Home() {
           phone: item.telefone || '',
           modality: item.modalidade || '',
           category: item.categoria || '',
-          teacher: professor?.nome || 'Sem professor',
+          teacher: professor?.nome || item.professor_preferencia || 'Sem professor',
           teacherId: item.professor_id || '',
           scheduledDate: item.data_agendada || '',
           scheduledTime: item.horario_agendado || '',
           notes: item.observacoes || '',
+          diaContato: item.dia_contato || '',
+          professorPreferencia: item.professor_preferencia || '',
+          diaPreferido: item.dia_preferido || '',
+          periodoPreferido: item.periodo_preferido || '',
+          horarioPodeFazer: item.horario_pode_fazer || '',
+          diaHorarioAulaExperimental: item.dia_horario_aula_experimental || '',
+          fezAulaExperimental: !!item.fez_aula_experimental,
+          entrouEmContatoAposAula: !!item.entrou_em_contato_apos_aula,
+          fechouPlano: !!item.fechou_plano,
+          motivoNaoFechou: item.motivo_nao_fechou || '',
+          statusLead: item.status_lead || '',
+          followUp: item.follow_up || '',
         };
       })
       .sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
@@ -664,6 +742,7 @@ export default function Home() {
     setPinError('');
     setClassSearch('');
     setSaveMessage('');
+    setStudentSaveMessage('');
   }
 
   function openClass(classId: string) {
@@ -759,8 +838,12 @@ export default function Home() {
     setSelectedMonth(name.toUpperCase());
   }
 
-  function updateExperimentalField(field: keyof typeof initialExperimentalForm, value: string) {
-    setExperimentalForm((current) => ({ ...current, [field]: value }));
+  function updateExperimentalField(field: keyof typeof initialExperimentalForm, value: string | boolean) {
+    setExperimentalForm((current) => ({ ...current, [field]: value as never }));
+  }
+
+  function updateStudentField(field: keyof typeof initialStudentForm, value: string | boolean) {
+    setStudentForm((current) => ({ ...current, [field]: value as never }));
   }
 
   async function handleSaveExperimental() {
@@ -772,7 +855,7 @@ export default function Home() {
     }
 
     if (!experimentalForm.telefone.trim()) {
-      setSaveMessage('Preencha o telefone do aluno experimental.');
+      setSaveMessage('Preencha o celular do aluno experimental.');
       return;
     }
 
@@ -784,6 +867,18 @@ export default function Home() {
       modalidade: experimentalForm.modalidade,
       categoria: experimentalForm.categoria.trim() || null,
       professor_id: experimentalForm.professor_id || null,
+      dia_contato: experimentalForm.dia_contato || null,
+      professor_preferencia: experimentalForm.professor_preferencia.trim() || null,
+      dia_preferido: experimentalForm.dia_preferido.trim() || null,
+      periodo_preferido: experimentalForm.periodo_preferido.trim() || null,
+      horario_pode_fazer: experimentalForm.horario_pode_fazer.trim() || null,
+      dia_horario_aula_experimental: experimentalForm.dia_horario_aula_experimental.trim() || null,
+      fez_aula_experimental: experimentalForm.fez_aula_experimental === 'sim',
+      entrou_em_contato_apos_aula: experimentalForm.entrou_em_contato_apos_aula === 'sim',
+      fechou_plano: experimentalForm.fechou_plano === 'sim',
+      motivo_nao_fechou: experimentalForm.motivo_nao_fechou.trim() || null,
+      status_lead: experimentalForm.status_lead.trim() || null,
+      follow_up: experimentalForm.follow_up.trim() || null,
       data_agendada: experimentalForm.data_agendada || null,
       horario_agendado: experimentalForm.horario_agendado || null,
       observacoes: experimentalForm.observacoes.trim() || null,
@@ -798,11 +893,65 @@ export default function Home() {
       return;
     }
 
-    setSaveMessage('Aluno experimental cadastrado com sucesso.');
+    setSaveMessage('Lead experimental cadastrado com sucesso.');
     setExperimentalForm({
       ...initialExperimentalForm,
       professor_id: experimentalForm.professor_id || teacherUsers[0]?.id || '',
     });
+    await loadAllData();
+  }
+
+  async function handleSaveStudent() {
+    setStudentSaveMessage('');
+
+    if (!studentForm.nome.trim()) {
+      setStudentSaveMessage('Preencha o nome completo do aluno.');
+      return;
+    }
+
+    if (!studentForm.telefone.trim()) {
+      setStudentSaveMessage('Preencha o celular do aluno.');
+      return;
+    }
+
+    if (studentForm.menor_idade && !studentForm.responsavel_nome.trim()) {
+      setStudentSaveMessage('Preencha o nome completo do responsável.');
+      return;
+    }
+
+    setSavingStudent(true);
+
+    const payload = {
+      nome: studentForm.nome.trim(),
+      telefone: studentForm.telefone.trim() || null,
+      email: studentForm.email.trim() || null,
+      cpf: studentForm.cpf.trim() || null,
+      data_nascimento: studentForm.data_nascimento || null,
+      endereco: studentForm.endereco.trim() || null,
+      cep: studentForm.cep.trim() || null,
+      data_inicio: studentForm.data_inicio || null,
+      menor_idade: !!studentForm.menor_idade,
+      responsavel_nome: studentForm.menor_idade ? studentForm.responsavel_nome.trim() || null : null,
+      responsavel_telefone: studentForm.menor_idade ? studentForm.responsavel_telefone.trim() || null : null,
+      responsavel_email: studentForm.menor_idade ? studentForm.responsavel_email.trim() || null : null,
+      responsavel_cpf: studentForm.menor_idade ? studentForm.responsavel_cpf.trim() || null : null,
+      responsavel_endereco: studentForm.menor_idade ? studentForm.responsavel_endereco.trim() || null : null,
+      responsavel_cep: studentForm.menor_idade ? studentForm.responsavel_cep.trim() || null : null,
+      status: 'ativo',
+      tipo: 'fixo',
+    };
+
+    const { error } = await supabase.from('alunos').insert(payload);
+
+    setSavingStudent(false);
+
+    if (error) {
+      setStudentSaveMessage(`Erro ao salvar aluno: ${error.message}`);
+      return;
+    }
+
+    setStudentSaveMessage('Aluno matriculado cadastrado com sucesso.');
+    setStudentForm(initialStudentForm);
     await loadAllData();
   }
 
@@ -863,6 +1012,234 @@ export default function Home() {
     );
   }
 
+  function renderStudentRegistrationSection() {
+    return (
+      <div className="section-gap">
+        <div>{sectionTitle('Cadastro de alunos matriculados')}</div>
+
+        <div className="panel-card" style={{ padding: 20 }}>
+          <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16, fontSize: 20 }}>
+            Dados do aluno
+          </div>
+
+          <div className="form-grid">
+            <div className="form-block">
+              <label className="form-label">Nome completo</label>
+              <input
+                className="field-input"
+                value={studentForm.nome}
+                onChange={(e) => updateStudentField('nome', e.target.value)}
+                placeholder="Nome completo"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Celular</label>
+              <input
+                className="field-input"
+                value={studentForm.telefone}
+                onChange={(e) => updateStudentField('telefone', e.target.value)}
+                placeholder="Celular"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">E-mail</label>
+              <input
+                className="field-input"
+                value={studentForm.email}
+                onChange={(e) => updateStudentField('email', e.target.value)}
+                placeholder="E-mail"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">CPF</label>
+              <input
+                className="field-input"
+                value={studentForm.cpf}
+                onChange={(e) => updateStudentField('cpf', e.target.value)}
+                placeholder="CPF"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Data de nascimento</label>
+              <input
+                type="date"
+                className="field-input"
+                value={studentForm.data_nascimento}
+                onChange={(e) => updateStudentField('data_nascimento', e.target.value)}
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Data de início</label>
+              <input
+                type="date"
+                className="field-input"
+                value={studentForm.data_inicio}
+                onChange={(e) => updateStudentField('data_inicio', e.target.value)}
+              />
+            </div>
+
+            <div className="form-block form-block-full">
+              <label className="form-label">Endereço</label>
+              <input
+                className="field-input"
+                value={studentForm.endereco}
+                onChange={(e) => updateStudentField('endereco', e.target.value)}
+                placeholder="Endereço"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">CEP</label>
+              <input
+                className="field-input"
+                value={studentForm.cep}
+                onChange={(e) => updateStudentField('cep', e.target.value)}
+                placeholder="CEP"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Menor de idade?</label>
+              <select
+                className="field-select"
+                value={studentForm.menor_idade ? 'sim' : 'nao'}
+                onChange={(e) => updateStudentField('menor_idade', e.target.value === 'sim')}
+              >
+                <option value="nao">Não</option>
+                <option value="sim">Sim</option>
+              </select>
+            </div>
+          </div>
+
+          {studentForm.menor_idade ? (
+            <div style={{ marginTop: 24 }}>
+              <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16, fontSize: 20 }}>
+                Dados do responsável
+              </div>
+
+              <div className="form-grid">
+                <div className="form-block">
+                  <label className="form-label">Nome completo</label>
+                  <input
+                    className="field-input"
+                    value={studentForm.responsavel_nome}
+                    onChange={(e) => updateStudentField('responsavel_nome', e.target.value)}
+                    placeholder="Nome completo do responsável"
+                  />
+                </div>
+
+                <div className="form-block">
+                  <label className="form-label">Celular</label>
+                  <input
+                    className="field-input"
+                    value={studentForm.responsavel_telefone}
+                    onChange={(e) => updateStudentField('responsavel_telefone', e.target.value)}
+                    placeholder="Celular do responsável"
+                  />
+                </div>
+
+                <div className="form-block">
+                  <label className="form-label">E-mail</label>
+                  <input
+                    className="field-input"
+                    value={studentForm.responsavel_email}
+                    onChange={(e) => updateStudentField('responsavel_email', e.target.value)}
+                    placeholder="E-mail do responsável"
+                  />
+                </div>
+
+                <div className="form-block">
+                  <label className="form-label">CPF</label>
+                  <input
+                    className="field-input"
+                    value={studentForm.responsavel_cpf}
+                    onChange={(e) => updateStudentField('responsavel_cpf', e.target.value)}
+                    placeholder="CPF do responsável"
+                  />
+                </div>
+
+                <div className="form-block form-block-full">
+                  <label className="form-label">Endereço</label>
+                  <input
+                    className="field-input"
+                    value={studentForm.responsavel_endereco}
+                    onChange={(e) => updateStudentField('responsavel_endereco', e.target.value)}
+                    placeholder="Endereço do responsável"
+                  />
+                </div>
+
+                <div className="form-block">
+                  <label className="form-label">CEP</label>
+                  <input
+                    className="field-input"
+                    value={studentForm.responsavel_cep}
+                    onChange={(e) => updateStudentField('responsavel_cep', e.target.value)}
+                    placeholder="CEP do responsável"
+                  />
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+            <button className="primary-btn-inline" onClick={handleSaveStudent} disabled={savingStudent}>
+              {savingStudent ? 'Salvando...' : 'Salvar aluno matriculado'}
+            </button>
+
+            {studentSaveMessage ? (
+              <span style={{ color: studentSaveMessage.includes('Erro') ? COLORS.red : COLORS.green, fontWeight: 700 }}>
+                {studentSaveMessage}
+              </span>
+            ) : null}
+          </div>
+        </div>
+
+        <div className="panel-card table-card">
+          <div className="table-header">Alunos já matriculados</div>
+          <div className="table-inner">
+            <table>
+              <thead>
+                <tr>
+                  <th>Aluno</th>
+                  <th>Celular</th>
+                  <th>E-mail</th>
+                  <th>CPF</th>
+                  <th>Data de início</th>
+                  <th>Menor?</th>
+                </tr>
+              </thead>
+              <tbody>
+                {dbAlunos.length > 0 ? (
+                  dbAlunos.map((aluno) => (
+                    <tr key={aluno.id}>
+                      <td><strong>{aluno.nome}</strong></td>
+                      <td>{aluno.telefone || '-'}</td>
+                      <td>{aluno.email || '-'}</td>
+                      <td>{aluno.cpf || '-'}</td>
+                      <td>{aluno.data_inicio || '-'}</td>
+                      <td>{aluno.menor_idade ? 'Sim' : 'Não'}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
+                      Nenhum aluno matriculado encontrado.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   function renderExperimentalSection(showConvertButton: boolean) {
     return (
       <div className="section-gap">
@@ -883,40 +1260,38 @@ export default function Home() {
 
         <div className="panel-card" style={{ padding: 20 }}>
           <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16, fontSize: 20 }}>
-            Cadastro de aula experimental
+            Cadastro de lead experimental
           </div>
 
           <div className="form-grid">
             <div className="form-block">
-              <label className="form-label">Nome</label>
+              <label className="form-label">Nome do aluno</label>
               <input
                 className="field-input"
                 value={experimentalForm.nome}
                 onChange={(e) => updateExperimentalField('nome', e.target.value)}
-                placeholder="Nome do aluno experimental"
+                placeholder="Nome do aluno"
               />
             </div>
 
             <div className="form-block">
-              <label className="form-label">Telefone</label>
+              <label className="form-label">Celular</label>
               <input
                 className="field-input"
                 value={experimentalForm.telefone}
                 onChange={(e) => updateExperimentalField('telefone', e.target.value)}
-                placeholder="Telefone"
+                placeholder="Celular"
               />
             </div>
 
             <div className="form-block">
-              <label className="form-label">Modalidade</label>
-              <select
-                className="field-select"
-                value={experimentalForm.modalidade}
-                onChange={(e) => updateExperimentalField('modalidade', e.target.value)}
-              >
-                <option value="Beach Tennis">Beach Tennis</option>
-                <option value="Futevôlei">Futevôlei</option>
-              </select>
+              <label className="form-label">Dia do contato</label>
+              <input
+                type="date"
+                className="field-input"
+                value={experimentalForm.dia_contato}
+                onChange={(e) => updateExperimentalField('dia_contato', e.target.value)}
+              />
             </div>
 
             <div className="form-block">
@@ -930,7 +1305,17 @@ export default function Home() {
             </div>
 
             <div className="form-block">
-              <label className="form-label">Professor</label>
+              <label className="form-label">Professor de preferência</label>
+              <input
+                className="field-input"
+                value={experimentalForm.professor_preferencia}
+                onChange={(e) => updateExperimentalField('professor_preferencia', e.target.value)}
+                placeholder="Professor de preferência"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Professor vinculado</label>
               <select
                 className="field-select"
                 value={experimentalForm.professor_id}
@@ -941,6 +1326,58 @@ export default function Home() {
                     {teacher.name}
                   </option>
                 ))}
+              </select>
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Dia preferido</label>
+              <input
+                className="field-input"
+                value={experimentalForm.dia_preferido}
+                onChange={(e) => updateExperimentalField('dia_preferido', e.target.value)}
+                placeholder="Dia preferido"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Período preferido</label>
+              <input
+                className="field-input"
+                value={experimentalForm.periodo_preferido}
+                onChange={(e) => updateExperimentalField('periodo_preferido', e.target.value)}
+                placeholder="Período preferido"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Horário que pode fazer</label>
+              <input
+                className="field-input"
+                value={experimentalForm.horario_pode_fazer}
+                onChange={(e) => updateExperimentalField('horario_pode_fazer', e.target.value)}
+                placeholder="Horário que pode fazer"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Dia e horário da aula experimental</label>
+              <input
+                className="field-input"
+                value={experimentalForm.dia_horario_aula_experimental}
+                onChange={(e) => updateExperimentalField('dia_horario_aula_experimental', e.target.value)}
+                placeholder="Dia e horário da aula experimental"
+              />
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Modalidade</label>
+              <select
+                className="field-select"
+                value={experimentalForm.modalidade}
+                onChange={(e) => updateExperimentalField('modalidade', e.target.value)}
+              >
+                <option value="Beach Tennis">Beach Tennis</option>
+                <option value="Futevôlei">Futevôlei</option>
               </select>
             </div>
 
@@ -964,13 +1401,79 @@ export default function Home() {
               />
             </div>
 
+            <div className="form-block">
+              <label className="form-label">Fez aula experimental?</label>
+              <select
+                className="field-select"
+                value={experimentalForm.fez_aula_experimental}
+                onChange={(e) => updateExperimentalField('fez_aula_experimental', e.target.value)}
+              >
+                <option value="nao">Não</option>
+                <option value="sim">Sim</option>
+              </select>
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Entrou em contato após aula?</label>
+              <select
+                className="field-select"
+                value={experimentalForm.entrou_em_contato_apos_aula}
+                onChange={(e) => updateExperimentalField('entrou_em_contato_apos_aula', e.target.value)}
+              >
+                <option value="nao">Não</option>
+                <option value="sim">Sim</option>
+              </select>
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Fechou o plano?</label>
+              <select
+                className="field-select"
+                value={experimentalForm.fechou_plano}
+                onChange={(e) => updateExperimentalField('fechou_plano', e.target.value)}
+              >
+                <option value="nao">Não</option>
+                <option value="sim">Sim</option>
+              </select>
+            </div>
+
+            <div className="form-block">
+              <label className="form-label">Status do lead</label>
+              <input
+                className="field-input"
+                value={experimentalForm.status_lead}
+                onChange={(e) => updateExperimentalField('status_lead', e.target.value)}
+                placeholder="Status do lead"
+              />
+            </div>
+
+            <div className="form-block form-block-full">
+              <label className="form-label">Motivo se não fechou</label>
+              <input
+                className="field-input"
+                value={experimentalForm.motivo_nao_fechou}
+                onChange={(e) => updateExperimentalField('motivo_nao_fechou', e.target.value)}
+                placeholder="Motivo se não fechou"
+              />
+            </div>
+
+            <div className="form-block form-block-full">
+              <label className="form-label">Follow-up</label>
+              <textarea
+                className="field-textarea"
+                value={experimentalForm.follow_up}
+                onChange={(e) => updateExperimentalField('follow_up', e.target.value)}
+                placeholder="Follow-up"
+              />
+            </div>
+
             <div className="form-block form-block-full">
               <label className="form-label">Observações</label>
               <textarea
                 className="field-textarea"
                 value={experimentalForm.observacoes}
                 onChange={(e) => updateExperimentalField('observacoes', e.target.value)}
-                placeholder="Observações sobre a aula experimental"
+                placeholder="Observações"
               />
             </div>
           </div>
@@ -989,19 +1492,26 @@ export default function Home() {
         </div>
 
         <div className="panel-card table-card">
-          <div className="table-header">Lista separada de alunos experimentais</div>
+          <div className="table-header">Leads experimentais</div>
           <div className="table-inner">
             <table>
               <thead>
                 <tr>
-                  <th>Nome</th>
-                  <th>Telefone</th>
-                  <th>Modalidade</th>
+                  <th>Aluno</th>
+                  <th>Celular</th>
+                  <th>Dia contato</th>
                   <th>Categoria</th>
-                  <th>Professor</th>
-                  <th>Data</th>
-                  <th>Horário</th>
-                  <th>Observações</th>
+                  <th>Professor preferência</th>
+                  <th>Dia preferido</th>
+                  <th>Período</th>
+                  <th>Horário disponível</th>
+                  <th>Aula experimental</th>
+                  <th>Fez?</th>
+                  <th>Pós-aula?</th>
+                  <th>Fechou?</th>
+                  <th>Status</th>
+                  <th>Motivo</th>
+                  <th>Follow-up</th>
                   {showConvertButton ? <th>Ação</th> : null}
                 </tr>
               </thead>
@@ -1011,12 +1521,19 @@ export default function Home() {
                     <tr key={item.id}>
                       <td><strong>{item.name}</strong></td>
                       <td>{item.phone || '-'}</td>
-                      <td>{item.modality || '-'}</td>
+                      <td>{item.diaContato || '-'}</td>
                       <td>{item.category || '-'}</td>
-                      <td>{item.teacher || '-'}</td>
-                      <td>{item.scheduledDate || '-'}</td>
-                      <td>{item.scheduledTime || '-'}</td>
-                      <td>{item.notes || '-'}</td>
+                      <td>{item.professorPreferencia || item.teacher || '-'}</td>
+                      <td>{item.diaPreferido || '-'}</td>
+                      <td>{item.periodoPreferido || '-'}</td>
+                      <td>{item.horarioPodeFazer || '-'}</td>
+                      <td>{item.diaHorarioAulaExperimental || '-'}</td>
+                      <td>{item.fezAulaExperimental ? 'Sim' : 'Não'}</td>
+                      <td>{item.entrouEmContatoAposAula ? 'Sim' : 'Não'}</td>
+                      <td>{item.fechouPlano ? 'Sim' : 'Não'}</td>
+                      <td>{item.statusLead || '-'}</td>
+                      <td>{item.motivoNaoFechou || '-'}</td>
+                      <td>{item.followUp || '-'}</td>
                       {showConvertButton ? (
                         <td>
                           <button className="chip-btn active" onClick={() => convertExperimentalToAluno(item)}>
@@ -1028,8 +1545,8 @@ export default function Home() {
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={showConvertButton ? 9 : 8} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
-                      Nenhum aluno experimental cadastrado ainda.
+                    <td colSpan={showConvertButton ? 16 : 15} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
+                      Nenhum lead experimental cadastrado ainda.
                     </td>
                   </tr>
                 )}
@@ -1045,9 +1562,10 @@ export default function Home() {
               <thead>
                 <tr>
                   <th>Aluno</th>
-                  <th>Telefone</th>
-                  <th>Status</th>
-                  <th>Tipo</th>
+                  <th>Celular</th>
+                  <th>E-mail</th>
+                  <th>CPF</th>
+                  <th>Data de início</th>
                 </tr>
               </thead>
               <tbody>
@@ -1056,13 +1574,14 @@ export default function Home() {
                     <tr key={aluno.id}>
                       <td><strong>{aluno.nome}</strong></td>
                       <td>{aluno.telefone || '-'}</td>
-                      <td>{aluno.status || '-'}</td>
-                      <td>{aluno.tipo || '-'}</td>
+                      <td>{aluno.email || '-'}</td>
+                      <td>{aluno.cpf || '-'}</td>
+                      <td>{aluno.data_inicio || '-'}</td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={4} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
+                    <td colSpan={5} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
                       Nenhum aluno matriculado cadastrado ainda.
                     </td>
                   </tr>
@@ -1429,6 +1948,7 @@ export default function Home() {
       th {
         border-bottom: 1px solid ${COLORS.border};
         font-size: 15px;
+        white-space: nowrap;
       }
       .empty-box {
         border: 1px dashed ${COLORS.border};
@@ -2084,75 +2604,7 @@ export default function Home() {
               </>
             ) : null}
 
-            {receptionTab === 'registrations' ? (
-              <div className="section-gap">
-                <div>{sectionTitle('Cadastros')}</div>
-
-                <div className="panel-card" style={{ padding: 20 }}>
-                  <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16 }}>Cadastro de alunos matriculados</div>
-                  <div className="form-grid">
-                    <div className="form-block">
-                      <label className="form-label">Nome do aluno</label>
-                      <input className="field-input" placeholder="Nome do aluno" />
-                    </div>
-                    <div className="form-block">
-                      <label className="form-label">Telefone</label>
-                      <input className="field-input" placeholder="Telefone" />
-                    </div>
-                    <div className="form-block">
-                      <label className="form-label">CPF</label>
-                      <input className="field-input" placeholder="CPF" />
-                    </div>
-                    <div className="form-block">
-                      <label className="form-label">Data de nascimento</label>
-                      <input className="field-input" placeholder="Data de nascimento" />
-                    </div>
-                    <div className="form-block">
-                      <label className="form-label">Responsável</label>
-                      <input className="field-input" placeholder="Responsável (se menor)" />
-                    </div>
-                    <div className="form-block">
-                      <label className="form-label">Telefone do responsável</label>
-                      <input className="field-input" placeholder="Telefone do responsável" />
-                    </div>
-                  </div>
-                </div>
-
-                <div className="panel-card table-card">
-                  <div className="table-header">Alunos já matriculados</div>
-                  <div className="table-inner">
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Aluno</th>
-                          <th>Telefone</th>
-                          <th>Status</th>
-                          <th>Tipo</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {dbAlunos.length > 0 ? (
-                          dbAlunos.map((aluno) => (
-                            <tr key={aluno.id}>
-                              <td><strong>{aluno.nome}</strong></td>
-                              <td>{aluno.telefone || '-'}</td>
-                              <td>{aluno.status || '-'}</td>
-                              <td>{aluno.tipo || '-'}</td>
-                            </tr>
-                          ))
-                        ) : (
-                          <tr>
-                            <td colSpan={4} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
-                              Nenhum aluno matriculado encontrado.
-                            </td>
-                          </tr>
-                        )}
-                      </tbody>
-                    </table>
-                  </div>
-                </div>
-              </div>
-            ) : null}
+            {receptionTab === 'registrations' ? renderStudentRegistrationSection() : null}
 
             {receptionTab === 'experimentals' ? renderExperimentalSection(false) : null}
           </div>
@@ -2276,75 +2728,7 @@ export default function Home() {
             </>
           ) : null}
 
-          {adminTab === 'registrations' ? (
-            <div className="section-gap">
-              <div>{sectionTitle('Cadastros')}</div>
-
-              <div className="panel-card" style={{ padding: 20 }}>
-                <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16 }}>Cadastro de alunos matriculados</div>
-                <div className="form-grid">
-                  <div className="form-block">
-                    <label className="form-label">Nome do aluno</label>
-                    <input className="field-input" placeholder="Nome do aluno" />
-                  </div>
-                  <div className="form-block">
-                    <label className="form-label">Telefone</label>
-                    <input className="field-input" placeholder="Telefone" />
-                  </div>
-                  <div className="form-block">
-                    <label className="form-label">CPF</label>
-                    <input className="field-input" placeholder="CPF" />
-                  </div>
-                  <div className="form-block">
-                    <label className="form-label">Data de nascimento</label>
-                    <input className="field-input" placeholder="Data de nascimento" />
-                  </div>
-                  <div className="form-block">
-                    <label className="form-label">Responsável</label>
-                    <input className="field-input" placeholder="Responsável (se menor)" />
-                  </div>
-                  <div className="form-block">
-                    <label className="form-label">Telefone do responsável</label>
-                    <input className="field-input" placeholder="Telefone do responsável" />
-                  </div>
-                </div>
-              </div>
-
-              <div className="panel-card table-card">
-                <div className="table-header">Alunos já matriculados</div>
-                <div className="table-inner">
-                  <table>
-                    <thead>
-                      <tr>
-                        <th>Aluno</th>
-                        <th>Telefone</th>
-                        <th>Status</th>
-                        <th>Tipo</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {dbAlunos.length > 0 ? (
-                        dbAlunos.map((aluno) => (
-                          <tr key={aluno.id}>
-                            <td><strong>{aluno.nome}</strong></td>
-                            <td>{aluno.telefone || '-'}</td>
-                            <td>{aluno.status || '-'}</td>
-                            <td>{aluno.tipo || '-'}</td>
-                          </tr>
-                        ))
-                      ) : (
-                        <tr>
-                          <td colSpan={4} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
-                            Nenhum aluno matriculado encontrado.
-                          </td>
-                        </tr>
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            </div>
-          ) : null}
+          {adminTab === 'registrations' ? renderStudentRegistrationSection() : null}
 
           {adminTab === 'financial' ? (
             <div className="section-gap">
