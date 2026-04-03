@@ -45,6 +45,8 @@ type DbAluno = {
   responsavel_cpf?: string | null;
   responsavel_endereco?: string | null;
   responsavel_cep?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type DbTurma = {
@@ -102,6 +104,8 @@ type DbExperimental = {
   motivo_nao_fechou?: string | null;
   status_lead?: string | null;
   follow_up?: string | null;
+  created_at?: string | null;
+  updated_at?: string | null;
 };
 
 type StudentCard = {
@@ -278,6 +282,32 @@ function formatInputMoney(value: number) {
   return value ? value.toFixed(2).replace('.', ',') : '';
 }
 
+function onlyDigits(value: string) {
+  return value.replace(/\D/g, '');
+}
+
+function maskPhone(value: string) {
+  const digits = onlyDigits(value).slice(0, 11);
+  if (digits.length <= 2) return digits;
+  if (digits.length <= 7) return `(${digits.slice(0, 2)}) ${digits.slice(2)}`;
+  if (digits.length <= 11) return `(${digits.slice(0, 2)}) ${digits.slice(2, 7)}-${digits.slice(7)}`;
+  return value;
+}
+
+function maskCPF(value: string) {
+  const digits = onlyDigits(value).slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+}
+
+function maskCEP(value: string) {
+  const digits = onlyDigits(value).slice(0, 8);
+  if (digits.length <= 5) return digits;
+  return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+}
+
 function toStatus(value?: string | null): 'ativo' | 'inadimplente' {
   return value === 'inadimplente' ? 'inadimplente' : 'ativo';
 }
@@ -370,6 +400,11 @@ export default function Home() {
   const [savingExperimental, setSavingExperimental] = useState(false);
   const [savingStudent, setSavingStudent] = useState(false);
   const [studentSaveMessage, setStudentSaveMessage] = useState('');
+
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [editingExperimentalId, setEditingExperimentalId] = useState<string | null>(null);
+  const [deletingStudentId, setDeletingStudentId] = useState<string | null>(null);
+  const [deletingExperimentalId, setDeletingExperimentalId] = useState<string | null>(null);
 
   const [experimentalForm, setExperimentalForm] = useState(initialExperimentalForm);
   const [studentForm, setStudentForm] = useState(initialStudentForm);
@@ -727,6 +762,7 @@ export default function Home() {
       setPin('');
       setPinError('');
       setSaveMessage('');
+      setStudentSaveMessage('');
       if (currentLoginUser.role === 'teacher') setScreen('teacher');
       if (currentLoginUser.role === 'reception') setScreen('reception');
       if (currentLoginUser.role === 'admin') setScreen('admin');
@@ -743,6 +779,10 @@ export default function Home() {
     setClassSearch('');
     setSaveMessage('');
     setStudentSaveMessage('');
+    setEditingStudentId(null);
+    setEditingExperimentalId(null);
+    setDeletingStudentId(null);
+    setDeletingExperimentalId(null);
   }
 
   function openClass(classId: string) {
@@ -882,9 +922,15 @@ export default function Home() {
       data_agendada: experimentalForm.data_agendada || null,
       horario_agendado: experimentalForm.horario_agendado || null,
       observacoes: experimentalForm.observacoes.trim() || null,
+      updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase.from('experimentais').insert(payload);
+    const query =
+      editingExperimentalId
+        ? supabase.from('experimentais').update(payload).eq('id', editingExperimentalId)
+        : supabase.from('experimentais').insert(payload);
+
+    const { error } = await query;
 
     setSavingExperimental(false);
 
@@ -893,7 +939,8 @@ export default function Home() {
       return;
     }
 
-    setSaveMessage('Lead experimental cadastrado com sucesso.');
+    setSaveMessage(editingExperimentalId ? 'Lead experimental atualizado com sucesso.' : 'Lead experimental cadastrado com sucesso.');
+    setEditingExperimentalId(null);
     setExperimentalForm({
       ...initialExperimentalForm,
       professor_id: experimentalForm.professor_id || teacherUsers[0]?.id || '',
@@ -939,9 +986,15 @@ export default function Home() {
       responsavel_cep: studentForm.menor_idade ? studentForm.responsavel_cep.trim() || null : null,
       status: 'ativo',
       tipo: 'fixo',
+      updated_at: new Date().toISOString(),
     };
 
-    const { error } = await supabase.from('alunos').insert(payload);
+    const query =
+      editingStudentId
+        ? supabase.from('alunos').update(payload).eq('id', editingStudentId)
+        : supabase.from('alunos').insert(payload);
+
+    const { error } = await query;
 
     setSavingStudent(false);
 
@@ -950,8 +1003,119 @@ export default function Home() {
       return;
     }
 
-    setStudentSaveMessage('Aluno matriculado cadastrado com sucesso.');
+    setStudentSaveMessage(editingStudentId ? 'Aluno atualizado com sucesso.' : 'Aluno matriculado cadastrado com sucesso.');
+    setEditingStudentId(null);
     setStudentForm(initialStudentForm);
+    await loadAllData();
+  }
+
+  function startEditStudent(aluno: DbAluno) {
+    setEditingStudentId(aluno.id);
+    setStudentSaveMessage('');
+    setStudentForm({
+      nome: aluno.nome || '',
+      telefone: maskPhone(aluno.telefone || ''),
+      email: aluno.email || '',
+      cpf: maskCPF(aluno.cpf || ''),
+      data_nascimento: aluno.data_nascimento || '',
+      endereco: aluno.endereco || '',
+      cep: maskCEP(aluno.cep || ''),
+      data_inicio: aluno.data_inicio || '',
+      menor_idade: !!aluno.menor_idade,
+      responsavel_nome: aluno.responsavel_nome || '',
+      responsavel_telefone: maskPhone(aluno.responsavel_telefone || ''),
+      responsavel_email: aluno.responsavel_email || '',
+      responsavel_cpf: maskCPF(aluno.responsavel_cpf || ''),
+      responsavel_endereco: aluno.responsavel_endereco || '',
+      responsavel_cep: maskCEP(aluno.responsavel_cep || ''),
+    });
+    setReceptionTab('registrations');
+    setAdminTab('registrations');
+  }
+
+  function cancelEditStudent() {
+    setEditingStudentId(null);
+    setStudentForm(initialStudentForm);
+    setStudentSaveMessage('');
+  }
+
+  async function deleteStudent(id: string) {
+    const confirmar = window.confirm('Deseja excluir este aluno matriculado?');
+    if (!confirmar) return;
+
+    setDeletingStudentId(id);
+    const { error } = await supabase.from('alunos').delete().eq('id', id);
+    setDeletingStudentId(null);
+
+    if (error) {
+      setStudentSaveMessage(`Erro ao excluir aluno: ${error.message}`);
+      return;
+    }
+
+    if (editingStudentId === id) {
+      cancelEditStudent();
+    }
+
+    setStudentSaveMessage('Aluno excluído com sucesso.');
+    await loadAllData();
+  }
+
+  function startEditExperimental(item: DbExperimental) {
+    setEditingExperimentalId(item.id);
+    setSaveMessage('');
+    setExperimentalForm({
+      nome: item.nome || '',
+      telefone: maskPhone(item.telefone || ''),
+      modalidade: item.modalidade || 'Beach Tennis',
+      categoria: item.categoria || '',
+      professor_id: item.professor_id || teacherUsers[0]?.id || '',
+      dia_contato: item.dia_contato || '',
+      professor_preferencia: item.professor_preferencia || '',
+      dia_preferido: item.dia_preferido || '',
+      periodo_preferido: item.periodo_preferido || '',
+      horario_pode_fazer: item.horario_pode_fazer || '',
+      dia_horario_aula_experimental: item.dia_horario_aula_experimental || '',
+      fez_aula_experimental: item.fez_aula_experimental ? 'sim' : 'nao',
+      entrou_em_contato_apos_aula: item.entrou_em_contato_apos_aula ? 'sim' : 'nao',
+      fechou_plano: item.fechou_plano ? 'sim' : 'nao',
+      motivo_nao_fechou: item.motivo_nao_fechou || '',
+      status_lead: item.status_lead || '',
+      follow_up: item.follow_up || '',
+      data_agendada: item.data_agendada || '',
+      horario_agendado: item.horario_agendado || '',
+      observacoes: item.observacoes || '',
+    });
+    setReceptionTab('experimentals');
+    setAdminTab('experimentals');
+  }
+
+  function cancelEditExperimental() {
+    setEditingExperimentalId(null);
+    setSaveMessage('');
+    setExperimentalForm({
+      ...initialExperimentalForm,
+      professor_id: teacherUsers[0]?.id || '',
+    });
+  }
+
+  async function deleteExperimental(id: string) {
+    const confirmar = window.confirm('Deseja excluir este lead experimental?');
+    if (!confirmar) return;
+
+    setDeletingExperimentalId(id);
+    const { error } = await supabase.from('experimentais').delete().eq('id', id);
+    setDeletingExperimentalId(null);
+
+    if (error) {
+      setSaveMessage(`Erro ao excluir experimental: ${error.message}`);
+      return;
+    }
+
+    if (editingExperimentalId === id) {
+      cancelEditExperimental();
+    }
+
+    setSaveMessage('Lead experimental excluído com sucesso.');
     await loadAllData();
   }
 
@@ -964,6 +1128,8 @@ export default function Home() {
       telefone: item.phone || null,
       status: 'ativo',
       tipo: 'fixo',
+      data_inicio: new Date().toISOString().slice(0, 10),
+      updated_at: new Date().toISOString(),
     });
 
     if (insertError) {
@@ -1015,7 +1181,7 @@ export default function Home() {
   function renderStudentRegistrationSection() {
     return (
       <div className="section-gap">
-        <div>{sectionTitle('Cadastro de alunos matriculados')}</div>
+        <div>{sectionTitle(editingStudentId ? 'Editar aluno matriculado' : 'Cadastro de alunos matriculados')}</div>
 
         <div className="panel-card" style={{ padding: 20 }}>
           <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16, fontSize: 20 }}>
@@ -1038,8 +1204,8 @@ export default function Home() {
               <input
                 className="field-input"
                 value={studentForm.telefone}
-                onChange={(e) => updateStudentField('telefone', e.target.value)}
-                placeholder="Celular"
+                onChange={(e) => updateStudentField('telefone', maskPhone(e.target.value))}
+                placeholder="(00) 00000-0000"
               />
             </div>
 
@@ -1058,8 +1224,8 @@ export default function Home() {
               <input
                 className="field-input"
                 value={studentForm.cpf}
-                onChange={(e) => updateStudentField('cpf', e.target.value)}
-                placeholder="CPF"
+                onChange={(e) => updateStudentField('cpf', maskCPF(e.target.value))}
+                placeholder="000.000.000-00"
               />
             </div>
 
@@ -1098,8 +1264,8 @@ export default function Home() {
               <input
                 className="field-input"
                 value={studentForm.cep}
-                onChange={(e) => updateStudentField('cep', e.target.value)}
-                placeholder="CEP"
+                onChange={(e) => updateStudentField('cep', maskCEP(e.target.value))}
+                placeholder="00000-000"
               />
             </div>
 
@@ -1138,8 +1304,8 @@ export default function Home() {
                   <input
                     className="field-input"
                     value={studentForm.responsavel_telefone}
-                    onChange={(e) => updateStudentField('responsavel_telefone', e.target.value)}
-                    placeholder="Celular do responsável"
+                    onChange={(e) => updateStudentField('responsavel_telefone', maskPhone(e.target.value))}
+                    placeholder="(00) 00000-0000"
                   />
                 </div>
 
@@ -1158,8 +1324,8 @@ export default function Home() {
                   <input
                     className="field-input"
                     value={studentForm.responsavel_cpf}
-                    onChange={(e) => updateStudentField('responsavel_cpf', e.target.value)}
-                    placeholder="CPF do responsável"
+                    onChange={(e) => updateStudentField('responsavel_cpf', maskCPF(e.target.value))}
+                    placeholder="000.000.000-00"
                   />
                 </div>
 
@@ -1178,8 +1344,8 @@ export default function Home() {
                   <input
                     className="field-input"
                     value={studentForm.responsavel_cep}
-                    onChange={(e) => updateStudentField('responsavel_cep', e.target.value)}
-                    placeholder="CEP do responsável"
+                    onChange={(e) => updateStudentField('responsavel_cep', maskCEP(e.target.value))}
+                    placeholder="00000-000"
                   />
                 </div>
               </div>
@@ -1188,8 +1354,14 @@ export default function Home() {
 
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
             <button className="primary-btn-inline" onClick={handleSaveStudent} disabled={savingStudent}>
-              {savingStudent ? 'Salvando...' : 'Salvar aluno matriculado'}
+              {savingStudent ? 'Salvando...' : editingStudentId ? 'Salvar alterações' : 'Salvar aluno matriculado'}
             </button>
+
+            {editingStudentId ? (
+              <button className="ghost-btn" onClick={cancelEditStudent}>
+                Cancelar edição
+              </button>
+            ) : null}
 
             {studentSaveMessage ? (
               <span style={{ color: studentSaveMessage.includes('Erro') ? COLORS.red : COLORS.green, fontWeight: 700 }}>
@@ -1211,6 +1383,7 @@ export default function Home() {
                   <th>CPF</th>
                   <th>Data de início</th>
                   <th>Menor?</th>
+                  <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -1223,11 +1396,26 @@ export default function Home() {
                       <td>{aluno.cpf || '-'}</td>
                       <td>{aluno.data_inicio || '-'}</td>
                       <td>{aluno.menor_idade ? 'Sim' : 'Não'}</td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <button className="chip-btn active" onClick={() => startEditStudent(aluno)}>
+                            Editar
+                          </button>
+                          <button
+                            className="chip-btn"
+                            onClick={() => deleteStudent(aluno.id)}
+                            disabled={deletingStudentId === aluno.id}
+                            style={{ color: COLORS.red, borderColor: COLORS.red }}
+                          >
+                            {deletingStudentId === aluno.id ? 'Excluindo...' : 'Excluir'}
+                          </button>
+                        </div>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={6} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
+                    <td colSpan={7} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
                       Nenhum aluno matriculado encontrado.
                     </td>
                   </tr>
@@ -1258,11 +1446,9 @@ export default function Home() {
           </div>
         </div>
 
-        <div className="panel-card" style={{ padding: 20 }}>
-          <div style={{ fontWeight: 700, color: COLORS.blue, marginBottom: 16, fontSize: 20 }}>
-            Cadastro de lead experimental
-          </div>
+        <div>{sectionTitle(editingExperimentalId ? 'Editar lead experimental' : 'Cadastro de lead experimental')}</div>
 
+        <div className="panel-card" style={{ padding: 20 }}>
           <div className="form-grid">
             <div className="form-block">
               <label className="form-label">Nome do aluno</label>
@@ -1279,8 +1465,8 @@ export default function Home() {
               <input
                 className="field-input"
                 value={experimentalForm.telefone}
-                onChange={(e) => updateExperimentalField('telefone', e.target.value)}
-                placeholder="Celular"
+                onChange={(e) => updateExperimentalField('telefone', maskPhone(e.target.value))}
+                placeholder="(00) 00000-0000"
               />
             </div>
 
@@ -1480,8 +1666,14 @@ export default function Home() {
 
           <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginTop: 16, flexWrap: 'wrap' }}>
             <button className="primary-btn-inline" onClick={handleSaveExperimental} disabled={savingExperimental}>
-              {savingExperimental ? 'Salvando...' : 'Salvar experimental'}
+              {savingExperimental ? 'Salvando...' : editingExperimentalId ? 'Salvar alterações' : 'Salvar experimental'}
             </button>
+
+            {editingExperimentalId ? (
+              <button className="ghost-btn" onClick={cancelEditExperimental}>
+                Cancelar edição
+              </button>
+            ) : null}
 
             {saveMessage ? (
               <span style={{ color: saveMessage.includes('Erro') ? COLORS.red : COLORS.green, fontWeight: 700 }}>
@@ -1512,7 +1704,7 @@ export default function Home() {
                   <th>Status</th>
                   <th>Motivo</th>
                   <th>Follow-up</th>
-                  {showConvertButton ? <th>Ação</th> : null}
+                  <th>Ações</th>
                 </tr>
               </thead>
               <tbody>
@@ -1534,18 +1726,31 @@ export default function Home() {
                       <td>{item.statusLead || '-'}</td>
                       <td>{item.motivoNaoFechou || '-'}</td>
                       <td>{item.followUp || '-'}</td>
-                      {showConvertButton ? (
-                        <td>
-                          <button className="chip-btn active" onClick={() => convertExperimentalToAluno(item)}>
-                            Matricular
+                      <td>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                          <button className="chip-btn active" onClick={() => startEditExperimental(dbExperimentais.find((e) => e.id === item.id)!)}>
+                            Editar
                           </button>
-                        </td>
-                      ) : null}
+                          <button
+                            className="chip-btn"
+                            onClick={() => deleteExperimental(item.id)}
+                            disabled={deletingExperimentalId === item.id}
+                            style={{ color: COLORS.red, borderColor: COLORS.red }}
+                          >
+                            {deletingExperimentalId === item.id ? 'Excluindo...' : 'Excluir'}
+                          </button>
+                          {showConvertButton ? (
+                            <button className="chip-btn active" onClick={() => convertExperimentalToAluno(item)}>
+                              Matricular
+                            </button>
+                          ) : null}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 ) : (
                   <tr>
-                    <td colSpan={showConvertButton ? 16 : 15} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
+                    <td colSpan={16} style={{ padding: 28, textAlign: 'center', color: COLORS.muted }}>
                       Nenhum lead experimental cadastrado ainda.
                     </td>
                   </tr>
@@ -2605,7 +2810,6 @@ export default function Home() {
             ) : null}
 
             {receptionTab === 'registrations' ? renderStudentRegistrationSection() : null}
-
             {receptionTab === 'experimentals' ? renderExperimentalSection(false) : null}
           </div>
         </main>
