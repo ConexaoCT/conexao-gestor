@@ -1119,64 +1119,30 @@ export default function Home() {
     await loadAllData();
   }
 
-  async function convertExperimentalToAluno(item: ExperimentalCard) {
-    const confirmar = window.confirm(`Deseja transformar ${item.name} em aluno matriculado?`);
-    if (!confirmar) return;
+function convertExperimentalToAluno(item: ExperimentalCard) {
+  setStudentForm({
+    nome: item.name || '',
+    telefone: maskPhone(item.phone || ''),
+    email: '',
+    cpf: '',
+    data_nascimento: '',
+    endereco: '',
+    cep: '',
+    data_inicio: new Date().toISOString().slice(0, 10),
+    menor_idade: false,
+    responsavel_nome: '',
+    responsavel_telefone: '',
+    responsavel_email: '',
+    responsavel_cpf: '',
+    responsavel_endereco: '',
+    responsavel_cep: '',
+  });
 
-    const { error: insertError } = await supabase.from('alunos').insert({
-      nome: item.name,
-      telefone: item.phone || null,
-      status: 'ativo',
-      tipo: 'fixo',
-      data_inicio: new Date().toISOString().slice(0, 10),
-      updated_at: new Date().toISOString(),
-    });
+  setReceptionTab('registrations');
+  setAdminTab('registrations');
 
-    if (insertError) {
-      setSaveMessage(`Erro ao matricular: ${insertError.message}`);
-      return;
-    }
-
-    const { error: deleteError } = await supabase.from('experimentais').delete().eq('id', item.id);
-
-    if (deleteError) {
-      setSaveMessage(`Aluno criado, mas houve erro ao remover da lista de experimentais: ${deleteError.message}`);
-      await loadAllData();
-      return;
-    }
-
-    setSaveMessage(`${item.name} foi movido para a lista de alunos matriculados.`);
-    await loadAllData();
-  }
-
-  function renderHeader(title: string, subtitle: string, badge: string) {
-    return (
-      <div className="panel-card panel-header">
-        <div>
-          <div className="badge-soft">{badge}</div>
-          <h1 className="panel-title">{title}</h1>
-          <p className="panel-subtitle">{subtitle}</p>
-        </div>
-
-        <div className="header-user">
-          <div className="avatar-circle">{currentUser?.initials || 'CT'}</div>
-          <div>
-            <div className="header-user-name">{currentUser?.name || 'Conexão CT'}</div>
-            <div className="header-user-role">
-              {currentUser?.role === 'teacher'
-                ? 'Professor'
-                : currentUser?.role === 'reception'
-                  ? 'Recepção'
-                  : 'Administração'}
-            </div>
-          </div>
-          <button className="ghost-btn" onClick={logout}>
-            Sair
-          </button>
-        </div>
-      </div>
-    );
-  }
+  setStudentSaveMessage(`Complete o cadastro para matricular ${item.name}`);
+}
 
   function renderStudentRegistrationSection() {
     return (
