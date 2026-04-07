@@ -261,7 +261,7 @@ export default function Home() {
         name: teacher.name,
         initials: initialsFromName(teacher.name),
         pin: teacher.pin,
-        role: 'teacher',
+        role: 'teacher' as const,
         sport: teacher.sport,
       };
     }).sort((a, b) => a.name.localeCompare(b.name, 'pt-BR'));
