@@ -225,10 +225,11 @@ function initialsFromName(name: string) {
 
 export default function Home() {
   const [screen, setScreen] = useState<'login' | 'teacher' | 'reception' | 'admin'>('login');
-  const [loginTab, setLoginTab] = useState<LoginTab>('admin');
-  const [pin, setPin] = useState('');
-  const [pinError, setPinError] = useState('');
-
+const [loginTab, setLoginTab] = useState<LoginTab>('admin');
+const [receptionTab, setReceptionTab] = useState<ReceptionTab>('students');
+const [adminTab, setAdminTab] = useState<AdminTab>('students');
+const [pin, setPin] = useState('');
+const [pinError, setPinError] = useState('');
   const [studentForm, setStudentForm] = useState(initialStudentForm);
   const [experimentalForm, setExperimentalForm] = useState(initialExperimentalForm);
 
