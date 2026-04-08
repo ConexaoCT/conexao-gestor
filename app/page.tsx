@@ -117,6 +117,18 @@ const COLORS = {
   redSoft: '#FEF2F2',
 };
 
+const th = {
+  padding: 8,
+  textAlign: 'left' as const,
+  fontSize: 12,
+  fontWeight: 700
+};
+
+const td = {
+  padding: 8,
+  fontSize: 13
+};
+
 const FIXED_ACCESS = {
   admin: { id: 'admin-fixed', name: 'Admin CT', pin: '9999', role: 'admin' as const },
   reception: { id: 'reception-fixed', name: 'Recepção CT', pin: '5555', role: 'reception' as const },
@@ -699,19 +711,63 @@ const [pinError, setPinError] = useState('');
                   </button>
                 </div>
 
-                <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
-                  <h2 style={{ color: COLORS.blue }}>Experimentais</h2>
-                  <ul>
-                    {dbExperimentais.map((item) => (
-                      <li key={item.id} style={{ marginBottom: 10 }}>
-                        {item.nome} — {item.telefone || '-'}{' '}
-                        <button onClick={() => convertExperimentalToAluno(item)} style={{ marginLeft: 8 }}>
-                          Matricular
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
+               <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
+  <h2 style={{ color: COLORS.blue }}>CRM de Experimentais</h2>
+
+  <div style={{ overflowX: 'auto' }}>
+    <table style={{ width: '100%', borderCollapse: 'collapse', marginTop: 12 }}>
+      <thead>
+        <tr style={{ background: COLORS.blueSoft }}>
+          <th style={th}>Nome</th>
+          <th style={th}>Telefone</th>
+          <th style={th}>Categoria</th>
+          <th style={th}>Professor</th>
+          <th style={th}>Dia Aula</th>
+          <th style={th}>Status</th>
+          <th style={th}>Plano</th>
+          <th style={th}>Ação</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {dbExperimentais.map((item) => (
+          <tr key={item.id} style={{ borderBottom: `1px solid ${COLORS.border}` }}>
+            <td style={td}>{item.nome}</td>
+            <td style={td}>{item.telefone}</td>
+            <td style={td}>{item.categoria}</td>
+            <td style={td}>{item.professor_preferencia}</td>
+            <td style={td}>{item.dia_horario_aula_experimental}</td>
+
+            <td style={td}>
+              {item.fechou_plano === 'sim' ? '🔥 Fechado' : '🟡 Em aberto'}
+            </td>
+
+            <td style={td}>
+              {item.fechou_plano === 'sim' ? 'Sim' : 'Não'}
+            </td>
+
+            <td style={td}>
+              <button
+                onClick={() => convertExperimentalToAluno(item)}
+                style={{
+                  padding: '6px 10px',
+                  borderRadius: 8,
+                  border: 'none',
+                  background: COLORS.blue,
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontWeight: 600
+                }}
+              >
+                Matricular
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+</div>
               </>
             )}
 
