@@ -183,6 +183,9 @@ const initialStudentForm: StudentFormState = {
   menor_idade: false,
   responsavel_nome: '',
   responsavel_telefone: '',
+  tipo_plano: 'padrao',
+plano_descricao: '',
+plano_valor: '',
 };
 
 const initialExperimentalForm: ExperimentalFormState = {
@@ -358,6 +361,9 @@ const [pinError, setPinError] = useState('');
       responsavel_telefone: studentForm.menor_idade ? studentForm.responsavel_telefone || null : null,
       status: 'ativo',
       tipo: 'fixo',
+      tipo_plano: studentForm.tipo_plano,
+plano_descricao: studentForm.tipo_plano === 'personalizado' ? studentForm.plano_descricao : null,
+plano_valor: studentForm.tipo_plano === 'personalizado' ? Number(studentForm.plano_valor) : null,
     };
 
     await supabase.from('alunos').insert(payload);
@@ -636,6 +642,39 @@ const [pinError, setPinError] = useState('');
                     <input placeholder="Endereço" value={studentForm.endereco} onChange={(e) => setStudentForm({ ...studentForm, endereco: e.target.value })} />
                     <input placeholder="CEP" value={studentForm.cep} onChange={(e) => setStudentForm({ ...studentForm, cep: maskCEP(e.target.value) })} />
                   </div>
+
+                  <select
+  value={studentForm.tipo_plano}
+  onChange={(e) => setStudentForm({ ...studentForm, tipo_plano: e.target.value })}
+>
+  <option value="padrao">Plano padrão</option>
+  <option value="personalizado">Plano personalizado</option>
+<div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
+  <select
+    value={studentForm.tipo_plano}
+    onChange={(e) => setStudentForm({ ...studentForm, tipo_plano: e.target.value })}
+    style={{ height: 42, borderRadius: 10, border: `1px solid ${COLORS.border}`, padding: '0 12px' }}
+  >
+    <option value="padrao">Plano padrão</option>
+    <option value="personalizado">Plano personalizado</option>
+  </select>
+
+  {studentForm.tipo_plano === 'personalizado' && (
+    <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+      <input
+        placeholder="Descrição do plano"
+        value={studentForm.plano_descricao}
+        onChange={(e) => setStudentForm({ ...studentForm, plano_descricao: e.target.value })}
+      />
+
+      <input
+        placeholder="Valor do plano"
+        type="number"
+        value={studentForm.plano_valor}
+        onChange={(e) => setStudentForm({ ...studentForm, plano_valor: e.target.value })}
+      />
+    </div>
+  )}
 
                   <div style={{ marginTop: 16 }}>
                     <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
