@@ -630,85 +630,121 @@ plano_valor: studentForm.tipo_plano === 'personalizado' ? Number(studentForm.pla
               (screen === 'reception' && receptionTab === 'students')) && (
               <>
                 <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
-                  <h2 style={{ color: COLORS.blue }}>Cadastro de alunos matriculados</h2>
+  <h2 style={{ color: COLORS.blue }}>Cadastro de alunos matriculados</h2>
 
-                  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
-                    <input placeholder="Nome completo" value={studentForm.nome} onChange={(e) => setStudentForm({ ...studentForm, nome: e.target.value })} />
-                    <input placeholder="Celular" value={studentForm.telefone} onChange={(e) => setStudentForm({ ...studentForm, telefone: maskPhone(e.target.value) })} />
-                    <input placeholder="E-mail" value={studentForm.email} onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })} />
-                    <input placeholder="CPF" value={studentForm.cpf} onChange={(e) => setStudentForm({ ...studentForm, cpf: maskCPF(e.target.value) })} />
-                    <input type="date" value={studentForm.data_nascimento} onChange={(e) => setStudentForm({ ...studentForm, data_nascimento: e.target.value })} />
-                    <input type="date" value={studentForm.data_inicio} onChange={(e) => setStudentForm({ ...studentForm, data_inicio: e.target.value })} />
-                    <input placeholder="Endereço" value={studentForm.endereco} onChange={(e) => setStudentForm({ ...studentForm, endereco: e.target.value })} />
-                    <input placeholder="CEP" value={studentForm.cep} onChange={(e) => setStudentForm({ ...studentForm, cep: maskCEP(e.target.value) })} />
-                  </div>
+  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+    <input
+      placeholder="Nome completo"
+      value={studentForm.nome}
+      onChange={(e) => setStudentForm({ ...studentForm, nome: e.target.value })}
+    />
+    <input
+      placeholder="Celular"
+      value={studentForm.telefone}
+      onChange={(e) => setStudentForm({ ...studentForm, telefone: maskPhone(e.target.value) })}
+    />
+    <input
+      placeholder="E-mail"
+      value={studentForm.email}
+      onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })}
+    />
+    <input
+      placeholder="CPF"
+      value={studentForm.cpf}
+      onChange={(e) => setStudentForm({ ...studentForm, cpf: maskCPF(e.target.value) })}
+    />
+    <input
+      type="date"
+      value={studentForm.data_nascimento}
+      onChange={(e) => setStudentForm({ ...studentForm, data_nascimento: e.target.value })}
+    />
+    <input
+      type="date"
+      value={studentForm.data_inicio}
+      onChange={(e) => setStudentForm({ ...studentForm, data_inicio: e.target.value })}
+    />
+    <input
+      placeholder="Endereço"
+      value={studentForm.endereco}
+      onChange={(e) => setStudentForm({ ...studentForm, endereco: e.target.value })}
+    />
+    <input
+      placeholder="CEP"
+      value={studentForm.cep}
+      onChange={(e) => setStudentForm({ ...studentForm, cep: maskCEP(e.target.value) })}
+    />
+  </div>
 
-                  <select
-  value={studentForm.tipo_plano}
-  onChange={(e) => setStudentForm({ ...studentForm, tipo_plano: e.target.value })}
->
-  <option value="padrao">Plano padrão</option>
-  <option value="personalizado">Plano personalizado</option>
-<div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
-  <select
-    value={studentForm.tipo_plano}
-    onChange={(e) => setStudentForm({ ...studentForm, tipo_plano: e.target.value })}
-    style={{ height: 42, borderRadius: 10, border: `1px solid ${COLORS.border}`, padding: '0 12px' }}
-  >
-    <option value="padrao">Plano padrão</option>
-    <option value="personalizado">Plano personalizado</option>
-  </select>
+  <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
+    <select
+      value={studentForm.tipo_plano}
+      onChange={(e) => setStudentForm({ ...studentForm, tipo_plano: e.target.value })}
+      style={{ height: 42, borderRadius: 10, border: `1px solid ${COLORS.border}`, padding: '0 12px' }}
+    >
+      <option value="padrao">Plano padrão</option>
+      <option value="personalizado">Plano personalizado</option>
+    </select>
 
-  {studentForm.tipo_plano === 'personalizado' && (
-    <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+    {studentForm.tipo_plano === 'personalizado' && (
+      <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+        <input
+          placeholder="Descrição do plano"
+          value={studentForm.plano_descricao}
+          onChange={(e) => setStudentForm({ ...studentForm, plano_descricao: e.target.value })}
+        />
+
+        <input
+          placeholder="Valor do plano"
+          type="number"
+          value={studentForm.plano_valor}
+          onChange={(e) => setStudentForm({ ...studentForm, plano_valor: e.target.value })}
+        />
+      </div>
+    )}
+  </div>
+
+  <div style={{ marginTop: 16 }}>
+    <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
       <input
-        placeholder="Descrição do plano"
-        value={studentForm.plano_descricao}
-        onChange={(e) => setStudentForm({ ...studentForm, plano_descricao: e.target.value })}
+        type="checkbox"
+        checked={studentForm.menor_idade}
+        onChange={(e) => setStudentForm({ ...studentForm, menor_idade: e.target.checked })}
       />
+      Menor de idade
+    </label>
+  </div>
 
+  {studentForm.menor_idade && (
+    <div style={{ marginTop: 16, display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
       <input
-        placeholder="Valor do plano"
-        type="number"
-        value={studentForm.plano_valor}
-        onChange={(e) => setStudentForm({ ...studentForm, plano_valor: e.target.value })}
+        placeholder="Nome do responsável"
+        value={studentForm.responsavel_nome}
+        onChange={(e) => setStudentForm({ ...studentForm, responsavel_nome: e.target.value })}
+      />
+      <input
+        placeholder="Celular do responsável"
+        value={studentForm.responsavel_telefone}
+        onChange={(e) => setStudentForm({ ...studentForm, responsavel_telefone: maskPhone(e.target.value) })}
       />
     </div>
   )}
 
-                  <div style={{ marginTop: 16 }}>
-                    <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                      <input
-                        type="checkbox"
-                        checked={studentForm.menor_idade}
-                        onChange={(e) => setStudentForm({ ...studentForm, menor_idade: e.target.checked })}
-                      />
-                      Menor de idade
-                    </label>
-                  </div>
-
-                  {studentForm.menor_idade && (
-                    <div style={{ marginTop: 16, display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
-                      <input
-                        placeholder="Nome do responsável"
-                        value={studentForm.responsavel_nome}
-                        onChange={(e) => setStudentForm({ ...studentForm, responsavel_nome: e.target.value })}
-                      />
-                      <input
-                        placeholder="Celular do responsável"
-                        value={studentForm.responsavel_telefone}
-                        onChange={(e) => setStudentForm({ ...studentForm, responsavel_telefone: maskPhone(e.target.value) })}
-                      />
-                    </div>
-                  )}
-
-                  <button
-                    onClick={saveStudent}
-                    style={{ marginTop: 16, height: 44, padding: '0 18px', borderRadius: 14, border: 'none', background: COLORS.blue, color: '#fff', fontWeight: 700 }}
-                  >
-                    Salvar aluno
-                  </button>
-                </div>
+  <button
+    onClick={saveStudent}
+    style={{
+      marginTop: 16,
+      height: 44,
+      padding: '0 18px',
+      borderRadius: 14,
+      border: 'none',
+      background: COLORS.blue,
+      color: '#fff',
+      fontWeight: 700
+    }}
+  >
+    Salvar aluno
+  </button>
+</div>
 
                 <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
                   <h2 style={{ color: COLORS.blue }}>Alunos matriculados</h2>
