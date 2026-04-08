@@ -330,7 +330,7 @@ export default function Home() {
     setLoginTab('admin');
   }
 
-  async function saveStudent() {
+    async function saveStudent() {
     const payload = {
       nome: studentForm.nome,
       telefone: studentForm.telefone || null,
@@ -493,111 +493,259 @@ export default function Home() {
 
         {(screen === 'admin' || screen === 'reception') && (
           <>
-            <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
-              <h2 style={{ color: COLORS.blue }}>Cadastro de alunos matriculados</h2>
+            <div
+              style={{
+                display: 'flex',
+                gap: 10,
+                flexWrap: 'wrap',
+                background: '#fff',
+                borderRadius: 20,
+                border: `1px solid ${COLORS.border}`,
+                padding: 14,
+              }}
+            >
+              <button
+                onClick={() => setScreen('admin')}
+                style={{
+                  height: 40,
+                  padding: '0 16px',
+                  borderRadius: 12,
+                  border: `1px solid ${COLORS.border}`,
+                  background: screen === 'admin' ? COLORS.blue : '#fff',
+                  color: screen === 'admin' ? '#fff' : COLORS.text,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                ADMIN
+              </button>
 
-              <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
-                <input placeholder="Nome completo" value={studentForm.nome} onChange={(e) => setStudentForm({ ...studentForm, nome: e.target.value })} />
-                <input placeholder="Celular" value={studentForm.telefone} onChange={(e) => setStudentForm({ ...studentForm, telefone: maskPhone(e.target.value) })} />
-                <input placeholder="E-mail" value={studentForm.email} onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })} />
-                <input placeholder="CPF" value={studentForm.cpf} onChange={(e) => setStudentForm({ ...studentForm, cpf: maskCPF(e.target.value) })} />
-                <input type="date" value={studentForm.data_nascimento} onChange={(e) => setStudentForm({ ...studentForm, data_nascimento: e.target.value })} />
-                <input type="date" value={studentForm.data_inicio} onChange={(e) => setStudentForm({ ...studentForm, data_inicio: e.target.value })} />
-                <input placeholder="Endereço" value={studentForm.endereco} onChange={(e) => setStudentForm({ ...studentForm, endereco: e.target.value })} />
-                <input placeholder="CEP" value={studentForm.cep} onChange={(e) => setStudentForm({ ...studentForm, cep: maskCEP(e.target.value) })} />
-              </div>
+              <button
+                onClick={() => setScreen('reception')}
+                style={{
+                  height: 40,
+                  padding: '0 16px',
+                  borderRadius: 12,
+                  border: `1px solid ${COLORS.border}`,
+                  background: screen === 'reception' ? COLORS.blue : '#fff',
+                  color: screen === 'reception' ? '#fff' : COLORS.text,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                RECEPÇÃO
+              </button>
+            </div>
 
-              <div style={{ marginTop: 16 }}>
-                <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-                  <input
-                    type="checkbox"
-                    checked={studentForm.menor_idade}
-                    onChange={(e) => setStudentForm({ ...studentForm, menor_idade: e.target.checked })}
-                  />
-                  Menor de idade
-                </label>
-              </div>
+            <div
+              style={{
+                display: 'flex',
+                gap: 10,
+                flexWrap: 'wrap',
+                background: '#fff',
+                borderRadius: 20,
+                border: `1px solid ${COLORS.border}`,
+                padding: 14,
+              }}
+            >
+              <button
+                onClick={() => (screen === 'admin' ? setAdminTab('students') : setReceptionTab('students'))}
+                style={{
+                  height: 40,
+                  padding: '0 16px',
+                  borderRadius: 12,
+                  border: `1px solid ${COLORS.border}`,
+                  background:
+                    (screen === 'admin' ? adminTab === 'students' : receptionTab === 'students') ? COLORS.blue : '#fff',
+                  color:
+                    (screen === 'admin' ? adminTab === 'students' : receptionTab === 'students') ? '#fff' : COLORS.text,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                ALUNOS MATRICULADOS
+              </button>
 
-              {studentForm.menor_idade && (
-                <div style={{ marginTop: 16, display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
-                  <input
-                    placeholder="Nome do responsável"
-                    value={studentForm.responsavel_nome}
-                    onChange={(e) => setStudentForm({ ...studentForm, responsavel_nome: e.target.value })}
-                  />
-                  <input
-                    placeholder="Celular do responsável"
-                    value={studentForm.responsavel_telefone}
-                    onChange={(e) => setStudentForm({ ...studentForm, responsavel_telefone: maskPhone(e.target.value) })}
-                  />
+              <button
+                onClick={() => (screen === 'admin' ? setAdminTab('experimentals') : setReceptionTab('experimentals'))}
+                style={{
+                  height: 40,
+                  padding: '0 16px',
+                  borderRadius: 12,
+                  border: `1px solid ${COLORS.border}`,
+                  background:
+                    (screen === 'admin' ? adminTab === 'experimentals' : receptionTab === 'experimentals')
+                      ? COLORS.blue
+                      : '#fff',
+                  color:
+                    (screen === 'admin' ? adminTab === 'experimentals' : receptionTab === 'experimentals')
+                      ? '#fff'
+                      : COLORS.text,
+                  fontWeight: 700,
+                  cursor: 'pointer',
+                }}
+              >
+                EXPERIMENTAIS
+              </button>
+
+              {screen === 'admin' ? (
+                <button
+                  onClick={() => setAdminTab('financial')}
+                  style={{
+                    height: 40,
+                    padding: '0 16px',
+                    borderRadius: 12,
+                    border: `1px solid ${COLORS.border}`,
+                    background: adminTab === 'financial' ? COLORS.blue : '#fff',
+                    color: adminTab === 'financial' ? '#fff' : COLORS.text,
+                    fontWeight: 700,
+                    cursor: 'pointer',
+                  }}
+                >
+                  FINANCEIRO
+                </button>
+              ) : null}
+            </div>
+
+            {((screen === 'admin' && adminTab === 'students') ||
+              (screen === 'reception' && receptionTab === 'students')) && (
+              <>
+                <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
+                  <h2 style={{ color: COLORS.blue }}>Cadastro de alunos matriculados</h2>
+
+                  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+                    <input placeholder="Nome completo" value={studentForm.nome} onChange={(e) => setStudentForm({ ...studentForm, nome: e.target.value })} />
+                    <input placeholder="Celular" value={studentForm.telefone} onChange={(e) => setStudentForm({ ...studentForm, telefone: maskPhone(e.target.value) })} />
+                    <input placeholder="E-mail" value={studentForm.email} onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })} />
+                    <input placeholder="CPF" value={studentForm.cpf} onChange={(e) => setStudentForm({ ...studentForm, cpf: maskCPF(e.target.value) })} />
+                    <input type="date" value={studentForm.data_nascimento} onChange={(e) => setStudentForm({ ...studentForm, data_nascimento: e.target.value })} />
+                    <input type="date" value={studentForm.data_inicio} onChange={(e) => setStudentForm({ ...studentForm, data_inicio: e.target.value })} />
+                    <input placeholder="Endereço" value={studentForm.endereco} onChange={(e) => setStudentForm({ ...studentForm, endereco: e.target.value })} />
+                    <input placeholder="CEP" value={studentForm.cep} onChange={(e) => setStudentForm({ ...studentForm, cep: maskCEP(e.target.value) })} />
+                  </div>
+
+                  <div style={{ marginTop: 16 }}>
+                    <label style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                      <input
+                        type="checkbox"
+                        checked={studentForm.menor_idade}
+                        onChange={(e) => setStudentForm({ ...studentForm, menor_idade: e.target.checked })}
+                      />
+                      Menor de idade
+                    </label>
+                  </div>
+
+                  {studentForm.menor_idade && (
+                    <div style={{ marginTop: 16, display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+                      <input
+                        placeholder="Nome do responsável"
+                        value={studentForm.responsavel_nome}
+                        onChange={(e) => setStudentForm({ ...studentForm, responsavel_nome: e.target.value })}
+                      />
+                      <input
+                        placeholder="Celular do responsável"
+                        value={studentForm.responsavel_telefone}
+                        onChange={(e) => setStudentForm({ ...studentForm, responsavel_telefone: maskPhone(e.target.value) })}
+                      />
+                    </div>
+                  )}
+
+                  <button
+                    onClick={saveStudent}
+                    style={{ marginTop: 16, height: 44, padding: '0 18px', borderRadius: 14, border: 'none', background: COLORS.blue, color: '#fff', fontWeight: 700 }}
+                  >
+                    Salvar aluno
+                  </button>
                 </div>
-              )}
 
-              <button
-                onClick={saveStudent}
-                style={{ marginTop: 16, height: 44, padding: '0 18px', borderRadius: 14, border: 'none', background: COLORS.blue, color: '#fff', fontWeight: 700 }}
-              >
-                Salvar aluno
-              </button>
-            </div>
+                <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
+                  <h2 style={{ color: COLORS.blue }}>Alunos matriculados</h2>
+                  <ul>
+                    {dbAlunos.map((aluno) => (
+                      <li key={aluno.id}>
+                        {aluno.nome} — {aluno.telefone || '-'}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            )}
 
-            <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
-              <h2 style={{ color: COLORS.blue }}>Cadastro de experimentais</h2>
+            {((screen === 'admin' && adminTab === 'experimentals') ||
+              (screen === 'reception' && receptionTab === 'experimentals')) && (
+              <>
+                <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
+                  <h2 style={{ color: COLORS.blue }}>Cadastro de experimentais</h2>
 
-              <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
-                <input placeholder="Nome do aluno" value={experimentalForm.nome} onChange={(e) => setExperimentalForm({ ...experimentalForm, nome: e.target.value })} />
-                <input placeholder="Celular" value={experimentalForm.telefone} onChange={(e) => setExperimentalForm({ ...experimentalForm, telefone: maskPhone(e.target.value) })} />
-                <input placeholder="E-mail" value={experimentalForm.email} onChange={(e) => setExperimentalForm({ ...experimentalForm, email: e.target.value })} />
-                <input type="date" value={experimentalForm.dia_contato} onChange={(e) => setExperimentalForm({ ...experimentalForm, dia_contato: e.target.value })} />
-                <input placeholder="Categoria" value={experimentalForm.categoria} onChange={(e) => setExperimentalForm({ ...experimentalForm, categoria: e.target.value })} />
-                <input placeholder="Professor de preferência" value={experimentalForm.professor_preferencia} onChange={(e) => setExperimentalForm({ ...experimentalForm, professor_preferencia: e.target.value })} />
-                <input placeholder="Dia preferido" value={experimentalForm.dia_preferido} onChange={(e) => setExperimentalForm({ ...experimentalForm, dia_preferido: e.target.value })} />
-                <input placeholder="Período preferido" value={experimentalForm.periodo_preferido} onChange={(e) => setExperimentalForm({ ...experimentalForm, periodo_preferido: e.target.value })} />
-                <input placeholder="Horário que pode fazer" value={experimentalForm.horario_pode_fazer} onChange={(e) => setExperimentalForm({ ...experimentalForm, horario_pode_fazer: e.target.value })} />
-                <input placeholder="Dia e horário da aula experimental" value={experimentalForm.dia_horario_aula_experimental} onChange={(e) => setExperimentalForm({ ...experimentalForm, dia_horario_aula_experimental: e.target.value })} />
+                  <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr' }}>
+                    <input placeholder="Nome do aluno" value={experimentalForm.nome} onChange={(e) => setExperimentalForm({ ...experimentalForm, nome: e.target.value })} />
+                    <input placeholder="Celular" value={experimentalForm.telefone} onChange={(e) => setExperimentalForm({ ...experimentalForm, telefone: maskPhone(e.target.value) })} />
+                    <input placeholder="E-mail" value={experimentalForm.email} onChange={(e) => setExperimentalForm({ ...experimentalForm, email: e.target.value })} />
+                    <input type="date" value={experimentalForm.dia_contato} onChange={(e) => setExperimentalForm({ ...experimentalForm, dia_contato: e.target.value })} />
+                    <input placeholder="Categoria" value={experimentalForm.categoria} onChange={(e) => setExperimentalForm({ ...experimentalForm, categoria: e.target.value })} />
+                    <input placeholder="Professor de preferência" value={experimentalForm.professor_preferencia} onChange={(e) => setExperimentalForm({ ...experimentalForm, professor_preferencia: e.target.value })} />
+                    <input placeholder="Dia preferido" value={experimentalForm.dia_preferido} onChange={(e) => setExperimentalForm({ ...experimentalForm, dia_preferido: e.target.value })} />
+                    <input placeholder="Período preferido" value={experimentalForm.periodo_preferido} onChange={(e) => setExperimentalForm({ ...experimentalForm, periodo_preferido: e.target.value })} />
+                    <input placeholder="Horário que pode fazer" value={experimentalForm.horario_pode_fazer} onChange={(e) => setExperimentalForm({ ...experimentalForm, horario_pode_fazer: e.target.value })} />
+                    <input placeholder="Dia e horário da aula experimental" value={experimentalForm.dia_horario_aula_experimental} onChange={(e) => setExperimentalForm({ ...experimentalForm, dia_horario_aula_experimental: e.target.value })} />
+                  </div>
+
+                  <button
+                    onClick={saveExperimental}
+                    style={{ marginTop: 16, height: 44, padding: '0 18px', borderRadius: 14, border: 'none', background: COLORS.blue, color: '#fff', fontWeight: 700 }}
+                  >
+                    Salvar experimental
+                  </button>
+                </div>
+
+                <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
+                  <h2 style={{ color: COLORS.blue }}>Experimentais</h2>
+                  <ul>
+                    {dbExperimentais.map((item) => (
+                      <li key={item.id} style={{ marginBottom: 10 }}>
+                        {item.nome} — {item.telefone || '-'}{' '}
+                        <button onClick={() => convertExperimentalToAluno(item)} style={{ marginLeft: 8 }}>
+                          Matricular
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              </>
+            )}
+
+            {screen === 'admin' && adminTab === 'financial' && (
+              <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
+                <h2 style={{ color: COLORS.blue }}>Financeiro</h2>
+                <p style={{ color: COLORS.muted }}>Próxima etapa: tabela financeira completa por mês.</p>
               </div>
-
-              <button
-                onClick={saveExperimental}
-                style={{ marginTop: 16, height: 44, padding: '0 18px', borderRadius: 14, border: 'none', background: COLORS.blue, color: '#fff', fontWeight: 700 }}
-              >
-                Salvar experimental
-              </button>
-            </div>
-
-            <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
-              <h2 style={{ color: COLORS.blue }}>Alunos matriculados</h2>
-              <ul>
-                {dbAlunos.map((aluno) => (
-                  <li key={aluno.id}>
-                    {aluno.nome} — {aluno.telefone || '-'}
-                  </li>
-                ))}
-              </ul>
-            </div>
-
-            <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
-              <h2 style={{ color: COLORS.blue }}>Experimentais</h2>
-              <ul>
-                {dbExperimentais.map((item) => (
-                  <li key={item.id} style={{ marginBottom: 10 }}>
-                    {item.nome} — {item.telefone || '-'}{' '}
-                    <button onClick={() => convertExperimentalToAluno(item)} style={{ marginLeft: 8 }}>
-                      Matricular
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
+            )}
           </>
         )}
 
         {screen === 'teacher' && (
           <div style={{ background: '#fff', borderRadius: 24, border: `1px solid ${COLORS.border}`, padding: 20 }}>
             <h2 style={{ color: COLORS.blue }}>Área do professor</h2>
-            <p style={{ color: COLORS.muted }}>
-              Estrutura pronta. Depois podemos evoluir com turmas do dia, presença e espelho financeiro.
+            <p style={{ color: COLORS.muted, marginBottom: 16 }}>
+              Estrutura inicial pronta. Próxima etapa: turmas do dia, presença e espelho financeiro.
             </p>
+
+            <div style={{ display: 'grid', gap: 12 }}>
+              {teacherUsers.map((teacher) => (
+                <div
+                  key={teacher.id}
+                  style={{
+                    border: `1px solid ${COLORS.border}`,
+                    borderRadius: 16,
+                    padding: 14,
+                    background: COLORS.blueSoft,
+                  }}
+                >
+                  <strong style={{ color: COLORS.blue }}>{teacher.name}</strong>
+                  <div style={{ color: COLORS.muted, marginTop: 4 }}>{teacher.sport}</div>
+                </div>
+              ))}
+            </div>
           </div>
         )}
       </div>
