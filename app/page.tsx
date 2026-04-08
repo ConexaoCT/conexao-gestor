@@ -739,11 +739,11 @@ const [pinError, setPinError] = useState('');
             <td style={td}>{item.dia_horario_aula_experimental}</td>
 
             <td style={td}>
-              {item.fechou_plano === 'sim' ? '🔥 Fechado' : '🟡 Em aberto'}
+              {item.fechou_plano ? '🔥 Fechado' : '🟡 Em aberto'}
             </td>
 
             <td style={td}>
-              {item.fechou_plano === 'sim' ? 'Sim' : 'Não'}
+              {item.fechou_plano ? 'Sim' : 'Não'}
             </td>
 
             <td style={td}>
