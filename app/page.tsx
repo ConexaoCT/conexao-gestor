@@ -1171,51 +1171,48 @@ setEditingStudentId(null);
                   <th style={thStyle}>Ação</th>
                 </tr>
               </thead>
-              <tbody>
-                {alunos.map((aluno) => (
-                  <tr key={aluno.id}>
-                    <td style={tdStyle}>{aluno.nome}</td>
-                    <td style={tdStyle}>{aluno.telefone || '-'}</td>
-                    <td style={tdStyle}>{getProfessorName(professores, aluno.professor_id)}</td>
-                    <td style={tdStyle}>{aluno.tipo_plano === 'personalizado' ? 'Personalizado' : aluno.plano_descricao || '-'}</td>
-                    <td style={tdStyle}>{formatMoney(aluno.plano_valor)}</td>
-                    <td style={tdStyle}>{aluno.status || 'ativo'}</td>
-<td style={tdStyle}>
-  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-    <button
-      style={secondaryButtonStyle()}
-      onClick={() => {
-        setEditingStudentId(aluno.id);
-        setStudentForm({
-          ...initialStudentForm,
-          ...aluno,
-          plano_valor: aluno.plano_valor ? String(aluno.plano_valor) : '',
-          menor_idade: Boolean(aluno.menor_idade),
-        });
-      }}
-    >
-      Editar
-    </button>
+             <tbody>
+  {alunos.map((aluno) => (
+    <tr key={aluno.id}>
+      <td style={tdStyle}>{aluno.nome}</td>
+      <td style={tdStyle}>{aluno.telefone || '-'}</td>
+      <td style={tdStyle}>{getProfessorName(professores, aluno.professor_id)}</td>
+      <td style={tdStyle}>{aluno.tipo_plano === 'personalizado' ? 'Personalizado' : aluno.plano_descricao || '-'}</td>
+      <td style={tdStyle}>{formatMoney(aluno.plano_valor)}</td>
+      <td style={tdStyle}>{aluno.status || 'ativo'}</td>
+      <td style={tdStyle}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          <button
+            style={secondaryButtonStyle()}
+            onClick={() => {
+              setEditingStudentId(aluno.id);
+              setStudentForm({
+                ...initialStudentForm,
+                ...aluno,
+                plano_valor: aluno.plano_valor ? String(aluno.plano_valor) : '',
+                menor_idade: Boolean(aluno.menor_idade),
+              });
+            }}
+          >
+            Editar
+          </button>
 
-    <button
-      style={secondaryButtonStyle()}
-      onClick={() => deleteRecord('alunos', aluno.id)}
-    >
-      Excluir
-    </button>
-  </div>
-</td>
-
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          <button
+            style={secondaryButtonStyle()}
+            onClick={() => deleteRecord('alunos', aluno.id)}
+          >
+            Excluir
+          </button>
         </div>
-      </section>
-    );
-  }
+      </td>
+    </tr>
+  ))}
+</tbody>
+</table>
+</div>
 
+);
+}
   function renderExperimentals() {
     return (
       <section style={{ display: 'grid', gap: 20 }}>
