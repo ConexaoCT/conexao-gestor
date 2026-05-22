@@ -1180,32 +1180,32 @@ setEditingStudentId(null);
                     <td style={tdStyle}>{aluno.tipo_plano === 'personalizado' ? 'Personalizado' : aluno.plano_descricao || '-'}</td>
                     <td style={tdStyle}>{formatMoney(aluno.plano_valor)}</td>
                     <td style={tdStyle}>{aluno.status || 'ativo'}</td>
-                    <td style={tdStyle}>
-                    
-<button
-style={{
-...secondaryButtonStyle(),
-marginRight:8
-}}
-onClick={()=>{
-setEditingStudentId(aluno.id)
+<td style={tdStyle}>
+  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+    <button
+      style={secondaryButtonStyle()}
+      onClick={() => {
+        setEditingStudentId(aluno.id);
+        setStudentForm({
+          ...initialStudentForm,
+          ...aluno,
+          plano_valor: aluno.plano_valor ? String(aluno.plano_valor) : '',
+          menor_idade: Boolean(aluno.menor_idade),
+        });
+      }}
+    >
+      Editar
+    </button>
 
-setStudentForm({
-...initialStudentForm,
-...aluno
-})
-}}
->
-Editar
-</button>
+    <button
+      style={secondaryButtonStyle()}
+      onClick={() => deleteRecord('alunos', aluno.id)}
+    >
+      Excluir
+    </button>
+  </div>
+</td>
 
-<button
-style={secondaryButtonStyle()}
-onClick={() => deleteRecord('alunos', aluno.id)}
->
-Excluir
-</button>
-                    </td>
                   </tr>
                 ))}
               </tbody>
