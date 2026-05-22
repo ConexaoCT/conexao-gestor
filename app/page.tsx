@@ -1181,7 +1181,7 @@ setEditingStudentId(null);
                     <td style={tdStyle}>{formatMoney(aluno.plano_valor)}</td>
                     <td style={tdStyle}>{aluno.status || 'ativo'}</td>
                     <td style={tdStyle}>
-                      <>
+                    
 <button
 style={{
 ...secondaryButtonStyle(),
@@ -1205,7 +1205,6 @@ onClick={() => deleteRecord('alunos', aluno.id)}
 >
 Excluir
 </button>
-</>
                     </td>
                   </tr>
                 ))}
