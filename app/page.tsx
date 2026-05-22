@@ -335,6 +335,7 @@ export default function Home() {
   const [currentProfessor, setCurrentProfessor] = useState<Professor | null>(null);
 
   const [studentForm, setStudentForm] = useState<StudentForm>(initialStudentForm);
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
   const [experimentalForm, setExperimentalForm] = useState<ExperimentalForm>(initialExperimentalForm);
   const [turmaForm, setTurmaForm] = useState<TurmaForm>(initialTurmaForm);
   const [financialForm, setFinancialForm] = useState<FinancialForm>(initialFinancialForm);
@@ -452,10 +453,94 @@ export default function Home() {
   }
 
   async function saveStudent() {
-    if (!studentForm.nome.trim()) {
-      alert('Preencha o nome do aluno.');
-      return;
+  if (!studentForm.nome.trim()) {
+    alert('Preencha o nome do aluno.');
+    return;
+  }
+
+  const planoValor =
+    studentForm.plano_valor.trim() === '' ? 0 : Number(studentForm.plano_valor.replace(',', '.'));
+
+  const studentPayload = {
+    nome: studentForm.nome.trim(),
+    telefone: studentForm.telefone || null,
+    email: studentForm.email || null,
+    cpf: studentForm.cpf || null,
+    data_nascimento: studentForm.data_nascimento || null,
+    endereco: studentForm.endereco || null,
+    cep: studentForm.cep || null,
+    data_inicio: studentForm.data_inicio || null,
+    tipo: 'fixo',
+    status: studentForm.status || 'ativo',
+    tipo_plano: studentForm.tipo_plano,
+    plano_descricao: studentForm.plano_descricao || null,
+    plano_valor: planoValor,
+    professor_id: studentForm.professor_id || null,
+    menor_idade: studentForm.menor_idade,
+    responsavel_nome: studentForm.menor_idade ? studentForm.responsavel_nome || null : null,
+    responsavel_telefone: studentForm.menor_idade ? studentForm.responsavel_telefone || null : null,
+    responsavel_email: studentForm.menor_idade ? studentForm.responsavel_email || null : null,
+    responsavel_cpf: studentForm.menor_idade ? studentForm.responsavel_cpf || null : null,
+    responsavel_endereco: studentForm.menor_idade ? studentForm.responsavel_endereco || null : null,
+    responsavel_cep: studentForm.menor_idade ? studentForm.responsavel_cep || null : null,
+  };
+
+  let alunoCriado = null;
+let alunoError = null;
+
+if (editingStudentId) {
+  const result = await supabase
+    .from('alunos')
+    .update(studentPayload)
+    .eq('id', editingStudentId)
+    .select()
+    .single();
+
+  alunoCriado = result.data;
+  alunoError = result.error;
+} else {
+  const result = await supabase
+    .from('alunos')
+    .insert(studentPayload)
+    .select()
+    .single();
+
+  alunoCriado = result.data;
+  alunoError = result.error;
+}
+
+  if (alunoError) {
+    alert(`Erro ao salvar aluno: ${alunoError.message}`);
+    return;
+  }
+
+  if (alunoCriado && planoValor > 0) {
+    const hoje = new Date();
+    const mes = hoje.toISOString().slice(0, 7);
+    const vencimento = `${mes}-10`;
+
+    const { error: financeiroError } = await supabase.from('financeiro').insert({
+      aluno_id: alunoCriado.id,
+      professor_id: studentForm.professor_id || null,
+      valor: planoValor,
+      vencimento,
+      mes,
+      recebido: false,
+      forma_pagamento: null,
+      status: 'pendente',
+      observacao: `Mensalidade gerada automaticamente - ${studentForm.plano_descricao || 'Plano'}`,
+    });
+
+    if (financeiroError) {
+      alert(`Aluno salvo, mas houve erro ao gerar financeiro: ${financeiroError.message}`);
     }
+  }
+
+  setStudentForm(initialStudentForm);
+setEditingStudentId(null);
+  await loadAllData();
+  alert('Aluno salvo e financeiro gerado automaticamente.');
+}
 
     const planoValor =
       studentForm.plano_valor.trim() === '' ? null : Number(studentForm.plano_valor.replace(',', '.'));
@@ -1096,7 +1181,31 @@ export default function Home() {
                     <td style={tdStyle}>{formatMoney(aluno.plano_valor)}</td>
                     <td style={tdStyle}>{aluno.status || 'ativo'}</td>
                     <td style={tdStyle}>
-                      <button style={secondaryButtonStyle()} onClick={() => deleteRecord('alunos', aluno.id)}>Excluir</button>
+                      <>
+<button
+style={{
+...secondaryButtonStyle(),
+marginRight:8
+}}
+onClick={()=>{
+setEditingStudentId(aluno.id)
+
+setStudentForm({
+...initialStudentForm,
+...aluno
+})
+}}
+>
+Editar
+</button>
+
+<button
+style={secondaryButtonStyle()}
+onClick={() => deleteRecord('alunos', aluno.id)}
+>
+Excluir
+</button>
+</>
                     </td>
                   </tr>
                 ))}
