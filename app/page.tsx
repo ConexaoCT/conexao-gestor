@@ -339,6 +339,11 @@ export default function Home() {
   const [turmaForm, setTurmaForm] = useState<TurmaForm>(initialTurmaForm);
   const [financialForm, setFinancialForm] = useState<FinancialForm>(initialFinancialForm);
 
+  const [editingStudentId, setEditingStudentId] = useState<string | null>(null);
+  const [editingExperimentalId, setEditingExperimentalId] = useState<string | null>(null);
+  const [editingTurmaId, setEditingTurmaId] = useState<string | null>(null);
+  const [editingFinancialId, setEditingFinancialId] = useState<string | null>(null);
+
   const [matriculaAlunoId, setMatriculaAlunoId] = useState('');
   const [matriculaTurmaId, setMatriculaTurmaId] = useState('');
 
@@ -458,7 +463,7 @@ export default function Home() {
     }
 
     const planoValor =
-      studentForm.plano_valor.trim() === '' ? null : Number(studentForm.plano_valor.replace(',', '.'));
+      studentForm.plano_valor.trim() === '' ? 0 : Number(studentForm.plano_valor.replace(',', '.'));
 
     const payload = {
       nome: studentForm.nome.trim(),
@@ -484,11 +489,52 @@ export default function Home() {
       responsavel_cep: studentForm.menor_idade ? studentForm.responsavel_cep || null : null,
     };
 
-    const { error } = await supabase.from('alunos').insert(payload);
+    if (editingStudentId) {
+      const { error } = await supabase.from('alunos').update(payload).eq('id', editingStudentId);
+
+      if (error) {
+        alert(`Erro ao atualizar aluno: ${error.message}`);
+        return;
+      }
+
+      setEditingStudentId(null);
+      setStudentForm(initialStudentForm);
+      await loadAllData();
+      alert('Aluno atualizado com sucesso.');
+      return;
+    }
+
+    const { data: alunoCriado, error } = await supabase
+      .from('alunos')
+      .insert(payload)
+      .select()
+      .single();
 
     if (error) {
       alert(`Erro ao salvar aluno: ${error.message}`);
       return;
+    }
+
+    if (alunoCriado && planoValor > 0) {
+      const hoje = new Date();
+      const mes = hoje.toISOString().slice(0, 7);
+      const vencimento = `${mes}-10`;
+
+      const { error: financeiroError } = await supabase.from('financeiro').insert({
+        aluno_id: alunoCriado.id,
+        professor_id: studentForm.professor_id || null,
+        valor: planoValor,
+        vencimento,
+        mes,
+        recebido: false,
+        forma_pagamento: null,
+        status: 'pendente',
+        observacao: `Mensalidade gerada automaticamente - ${studentForm.plano_descricao || 'Plano'}`,
+      });
+
+      if (financeiroError) {
+        alert(`Aluno salvo, mas houve erro ao gerar financeiro: ${financeiroError.message}`);
+      }
     }
 
     setStudentForm(initialStudentForm);
@@ -524,16 +570,21 @@ export default function Home() {
       observacoes: experimentalForm.observacoes || null,
     };
 
-    const { error } = await supabase.from('experimentais').insert(payload);
+    const query = editingExperimentalId
+      ? supabase.from('experimentais').update(payload).eq('id', editingExperimentalId)
+      : supabase.from('experimentais').insert(payload);
+
+    const { error } = await query;
 
     if (error) {
       alert(`Erro ao salvar experimental: ${error.message}`);
       return;
     }
 
+    setEditingExperimentalId(null);
     setExperimentalForm(initialExperimentalForm);
     await loadAllData();
-    alert('Experimental salvo com sucesso.');
+    alert(editingExperimentalId ? 'Experimental atualizado com sucesso.' : 'Experimental salvo com sucesso.');
   }
 
   async function saveTurma() {
@@ -554,16 +605,21 @@ export default function Home() {
       ativa: true,
     };
 
-    const { error } = await supabase.from('turmas').insert(payload);
+    const query = editingTurmaId
+      ? supabase.from('turmas').update(payload).eq('id', editingTurmaId)
+      : supabase.from('turmas').insert(payload);
+
+    const { error } = await query;
 
     if (error) {
       alert(`Erro ao salvar turma: ${error.message}`);
       return;
     }
 
+    setEditingTurmaId(null);
     setTurmaForm(initialTurmaForm);
     await loadAllData();
-    alert('Turma salva com sucesso.');
+    alert(editingTurmaId ? 'Turma atualizada com sucesso.' : 'Turma salva com sucesso.');
   }
 
   async function saveMatricula() {
@@ -608,16 +664,21 @@ export default function Home() {
       observacao: financialForm.observacao || null,
     };
 
-    const { error } = await supabase.from('financeiro').insert(payload);
+    const query = editingFinancialId
+      ? supabase.from('financeiro').update(payload).eq('id', editingFinancialId)
+      : supabase.from('financeiro').insert(payload);
+
+    const { error } = await query;
 
     if (error) {
       alert(`Erro ao salvar financeiro: ${error.message}`);
       return;
     }
 
+    setEditingFinancialId(null);
     setFinancialForm(initialFinancialForm);
     await loadAllData();
-    alert('Lançamento financeiro salvo.');
+    alert(editingFinancialId ? 'Lançamento financeiro atualizado.' : 'Lançamento financeiro salvo.');
   }
 
   async function convertExperimentalToStudent(item: Experimental) {
@@ -1065,9 +1126,23 @@ export default function Home() {
             </div>
           )}
 
-          <button onClick={saveStudent} style={{ ...primaryButtonStyle(), marginTop: 16 }}>
-            Salvar aluno
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
+            <button onClick={saveStudent} style={primaryButtonStyle()}>
+              {editingStudentId ? 'Salvar alterações do aluno' : 'Salvar aluno'}
+            </button>
+
+            {editingStudentId ? (
+              <button
+                style={secondaryButtonStyle()}
+                onClick={() => {
+                  setEditingStudentId(null);
+                  setStudentForm(initialStudentForm);
+                }}
+              >
+                Cancelar edição
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div style={cardStyle}>
@@ -1096,7 +1171,39 @@ export default function Home() {
                     <td style={tdStyle}>{formatMoney(aluno.plano_valor)}</td>
                     <td style={tdStyle}>{aluno.status || 'ativo'}</td>
                     <td style={tdStyle}>
-                      <button style={secondaryButtonStyle()} onClick={() => deleteRecord('alunos', aluno.id)}>Excluir</button>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button
+                          style={secondaryButtonStyle()}
+                          onClick={() => {
+                            setEditingStudentId(aluno.id);
+                            setStudentForm({
+                              nome: aluno.nome || '',
+                              telefone: aluno.telefone || '',
+                              email: aluno.email || '',
+                              cpf: aluno.cpf || '',
+                              data_nascimento: aluno.data_nascimento || '',
+                              endereco: aluno.endereco || '',
+                              cep: aluno.cep || '',
+                              data_inicio: aluno.data_inicio || '',
+                              status: aluno.status || 'ativo',
+                              tipo_plano: aluno.tipo_plano || 'padrao',
+                              plano_descricao: aluno.plano_descricao || '',
+                              plano_valor: aluno.plano_valor ? String(aluno.plano_valor) : '',
+                              professor_id: aluno.professor_id || '',
+                              menor_idade: Boolean(aluno.menor_idade),
+                              responsavel_nome: aluno.responsavel_nome || '',
+                              responsavel_telefone: aluno.responsavel_telefone || '',
+                              responsavel_email: aluno.responsavel_email || '',
+                              responsavel_cpf: aluno.responsavel_cpf || '',
+                              responsavel_endereco: aluno.responsavel_endereco || '',
+                              responsavel_cep: aluno.responsavel_cep || '',
+                            });
+                          }}
+                        >
+                          Editar
+                        </button>
+                        <button style={secondaryButtonStyle()} onClick={() => deleteRecord('alunos', aluno.id)}>Excluir</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1184,9 +1291,23 @@ export default function Home() {
             <textarea style={textareaStyle()} placeholder="Observações / follow-up" value={experimentalForm.observacoes} onChange={(e) => setExperimentalForm({ ...experimentalForm, observacoes: e.target.value })} />
           </div>
 
-          <button onClick={saveExperimental} style={{ ...primaryButtonStyle(), marginTop: 16 }}>
-            Salvar experimental
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
+            <button onClick={saveExperimental} style={primaryButtonStyle()}>
+              {editingExperimentalId ? 'Salvar alterações do experimental' : 'Salvar experimental'}
+            </button>
+
+            {editingExperimentalId ? (
+              <button
+                style={secondaryButtonStyle()}
+                onClick={() => {
+                  setEditingExperimentalId(null);
+                  setExperimentalForm(initialExperimentalForm);
+                }}
+              >
+                Cancelar edição
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div style={cardStyle}>
@@ -1221,6 +1342,35 @@ export default function Home() {
                     <td style={tdStyle}>{item.follow_up || '-'}</td>
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button
+                          style={secondaryButtonStyle()}
+                          onClick={() => {
+                            setEditingExperimentalId(item.id);
+                            setExperimentalForm({
+                              nome: item.nome || '',
+                              telefone: item.telefone || '',
+                              email: item.email || '',
+                              modalidade: item.modalidade || 'Beach Tennis',
+                              categoria: item.categoria || '',
+                              professor_id: item.professor_id || '',
+                              professor_preferencia: item.professor_preferencia || '',
+                              dia_contato: item.dia_contato || new Date().toISOString().slice(0, 10),
+                              dia_preferido: item.dia_preferido || '',
+                              periodo_preferido: item.periodo_preferido || '',
+                              horario_pode_fazer: item.horario_pode_fazer || '',
+                              dia_horario_aula_experimental: item.dia_horario_aula_experimental || '',
+                              fez_aula_experimental: Boolean(item.fez_aula_experimental),
+                              entrou_em_contato_apos_aula: Boolean(item.entrou_em_contato_apos_aula),
+                              fechou_plano: Boolean(item.fechou_plano),
+                              motivo_nao_fechou: item.motivo_nao_fechou || '',
+                              status_lead: item.status_lead || 'novo',
+                              follow_up: item.follow_up || '',
+                              observacoes: item.observacoes || '',
+                            });
+                          }}
+                        >
+                          Editar
+                        </button>
                         <button style={secondaryButtonStyle()} onClick={() => convertExperimentalToStudent(item)}>Matricular</button>
                         <button style={secondaryButtonStyle()} onClick={() => deleteRecord('experimentais', item.id)}>Excluir</button>
                       </div>
@@ -1280,9 +1430,23 @@ export default function Home() {
             <input style={inputStyle()} placeholder="Capacidade" type="number" value={turmaForm.capacidade} onChange={(e) => setTurmaForm({ ...turmaForm, capacidade: e.target.value })} />
           </div>
 
-          <button onClick={saveTurma} style={{ ...primaryButtonStyle(), marginTop: 16 }}>
-            Salvar turma
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
+            <button onClick={saveTurma} style={primaryButtonStyle()}>
+              {editingTurmaId ? 'Salvar alterações da turma' : 'Salvar turma'}
+            </button>
+
+            {editingTurmaId ? (
+              <button
+                style={secondaryButtonStyle()}
+                onClick={() => {
+                  setEditingTurmaId(null);
+                  setTurmaForm(initialTurmaForm);
+                }}
+              >
+                Cancelar edição
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div style={cardStyle}>
@@ -1314,7 +1478,27 @@ export default function Home() {
                     <td style={tdStyle}>{turma.horario || '-'}</td>
                     <td style={tdStyle}>{turma.capacidade || '-'}</td>
                     <td style={tdStyle}>
-                      <button style={secondaryButtonStyle()} onClick={() => deleteRecord('turmas', turma.id)}>Excluir</button>
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button
+                          style={secondaryButtonStyle()}
+                          onClick={() => {
+                            setEditingTurmaId(turma.id);
+                            setTurmaForm({
+                              nome: turma.nome || '',
+                              modalidade: turma.modalidade || 'Beach Tennis',
+                              categoria: turma.categoria || '',
+                              professor_id: turma.professor_id || '',
+                              dia_semana: turma.dia_semana || '',
+                              horario: turma.horario || '',
+                              quadra: turma.quadra || '',
+                              capacidade: turma.capacidade ? String(turma.capacidade) : '4',
+                            });
+                          }}
+                        >
+                          Editar
+                        </button>
+                        <button style={secondaryButtonStyle()} onClick={() => deleteRecord('turmas', turma.id)}>Excluir</button>
+                      </div>
                     </td>
                   </tr>
                 ))}
@@ -1475,9 +1659,23 @@ export default function Home() {
 
           <textarea style={{ ...textareaStyle(), width: '100%', marginTop: 12 }} placeholder="Observação" value={financialForm.observacao} onChange={(e) => setFinancialForm({ ...financialForm, observacao: e.target.value })} />
 
-          <button onClick={saveFinancial} style={{ ...primaryButtonStyle(), marginTop: 16 }}>
-            Salvar financeiro
-          </button>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
+            <button onClick={saveFinancial} style={primaryButtonStyle()}>
+              {editingFinancialId ? 'Salvar alterações do financeiro' : 'Salvar financeiro'}
+            </button>
+
+            {editingFinancialId ? (
+              <button
+                style={secondaryButtonStyle()}
+                onClick={() => {
+                  setEditingFinancialId(null);
+                  setFinancialForm(initialFinancialForm);
+                }}
+              >
+                Cancelar edição
+              </button>
+            ) : null}
+          </div>
         </div>
 
         <div style={cardStyle}>
@@ -1510,6 +1708,25 @@ export default function Home() {
                     <td style={tdStyle}>{item.forma_pagamento || '-'}</td>
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                        <button
+                          style={secondaryButtonStyle()}
+                          onClick={() => {
+                            setEditingFinancialId(item.id);
+                            setFinancialForm({
+                              aluno_id: item.aluno_id || '',
+                              professor_id: item.professor_id || '',
+                              valor: item.valor ? String(item.valor) : '',
+                              vencimento: item.vencimento || new Date().toISOString().slice(0, 10),
+                              mes: item.mes || new Date().toISOString().slice(0, 7),
+                              recebido: Boolean(item.recebido),
+                              forma_pagamento: item.forma_pagamento || '',
+                              status: item.status || 'pendente',
+                              observacao: item.observacao || '',
+                            });
+                          }}
+                        >
+                          Editar
+                        </button>
                         <button style={secondaryButtonStyle()} onClick={() => togglePayment(item)}>
                           {item.recebido ? 'Marcar pendente' : 'Marcar recebido'}
                         </button>
