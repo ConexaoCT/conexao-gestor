@@ -1,5 +1,15 @@
 'use client';
 
+/*
+VERSÃO RESPONSIVA TABLET + CELULAR
+- Layout adaptável
+- Melhor visual mobile
+- Cards responsivos
+- Mantida estrutura operacional
+*/
+
+
+
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
@@ -1215,7 +1225,7 @@ export default function Home() {
     ];
 
     return (
-      <section style={{ display: 'grid', gap: 18, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+      <section style={{ display: 'grid', gap: 18, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
         {cards.map(([title, value, desc]) => (
           <div key={title} style={{ ...cardStyle, position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, right: 0, width: 90, height: 90, borderRadius: '0 0 0 90px', background: 'rgba(126, 217, 87, 0.18)' }} />
@@ -1237,7 +1247,7 @@ export default function Home() {
         <div style={cardStyle}>
           <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Cadastro de alunos</h2>
 
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
             <input style={inputStyle()} placeholder="Nome completo" value={studentForm.nome} onChange={(e) => setStudentForm({ ...studentForm, nome: e.target.value })} />
             <input style={inputStyle()} placeholder="Celular" value={studentForm.telefone} onChange={(e) => setStudentForm({ ...studentForm, telefone: maskPhone(e.target.value) })} />
             <input style={inputStyle()} placeholder="E-mail" value={studentForm.email} onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })} />
@@ -1412,7 +1422,7 @@ export default function Home() {
         <div style={cardStyle}>
           <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Cadastro de experimentais</h2>
 
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
             <input style={inputStyle()} placeholder="Nome do aluno" value={experimentalForm.nome} onChange={(e) => setExperimentalForm({ ...experimentalForm, nome: e.target.value })} />
             <input style={inputStyle()} placeholder="Celular" value={experimentalForm.telefone} onChange={(e) => setExperimentalForm({ ...experimentalForm, telefone: maskPhone(e.target.value) })} />
             <input style={inputStyle()} placeholder="E-mail" value={experimentalForm.email} onChange={(e) => setExperimentalForm({ ...experimentalForm, email: e.target.value })} />
@@ -1588,7 +1598,7 @@ export default function Home() {
         <div style={cardStyle}>
           <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Cadastro de turmas</h2>
 
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
             <input style={inputStyle()} placeholder="Nome da turma" value={turmaForm.nome} onChange={(e) => setTurmaForm({ ...turmaForm, nome: e.target.value })} />
 
             <select style={inputStyle()} value={turmaForm.modalidade} onChange={(e) => setTurmaForm({ ...turmaForm, modalidade: e.target.value })}>
@@ -1812,7 +1822,7 @@ export default function Home() {
         <div style={cardStyle}>
           <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Lançamento financeiro</h2>
 
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
             <select style={inputStyle()} value={financialForm.aluno_id} onChange={(e) => applyStudentToFinancialForm(e.target.value)}>
               <option value="">Aluno</option>
               {alunos.map((aluno) => (
