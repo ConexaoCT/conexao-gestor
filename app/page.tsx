@@ -1,22 +1,12 @@
 'use client';
 
-/*
-VERSÃO RESPONSIVA TABLET + CELULAR
-- Layout adaptável
-- Melhor visual mobile
-- Cards responsivos
-- Mantida estrutura operacional
-*/
-
-
-
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
 
 type Screen = 'login' | 'admin' | 'reception' | 'teacher';
 type LoginTab = 'admin' | 'reception' | 'teacher';
 type AdminTab = 'dashboard' | 'students' | 'experimentals' | 'classes' | 'enrollments' | 'attendance' | 'financial';
-type ReceptionTab = 'students' | 'experimentals' | 'classes' | 'enrollments' | 'attendance';
+type ReceptionTab = 'students' | 'experimentals' | 'classes' | 'enrollments';
 type TeacherTab = 'today' | 'students' | 'financial';
 
 type Professor = {
@@ -51,7 +41,6 @@ type Aluno = {
   responsavel_cpf: string | null;
   responsavel_endereco: string | null;
   responsavel_cep: string | null;
-  created_at?: string | null;
 };
 
 type Experimental = {
@@ -190,37 +179,17 @@ type FinancialForm = {
   observacao: string;
 };
 
-type NoticeKind = 'success' | 'error' | 'info';
-
-type NoticeState = {
-  title: string;
-  message: string;
-  kind: NoticeKind;
-};
-
-type ConfirmState = {
-  title: string;
-  message: string;
-  onConfirm: () => void | Promise<void>;
-};
-
 const COLORS = {
-  blue: '#001E94',
-  blueDark: '#07135C',
-  blueSoft: '#EEF4FF',
-  green: '#7ED957',
-  bg: '#F4F7FB',
-  text: '#111827',
-  muted: '#64748B',
-  border: '#D8E0EF',
-  danger: '#C0392B',
-  warning: '#F59E0B',
-  surface: '#FFFFFF',
-  surfaceSoft: '#F8FAFF',
-  shadow: '0 18px 50px rgba(0, 30, 148, 0.10)',
-  shadowStrong: '0 24px 70px rgba(0, 30, 148, 0.16)',
-  gradient: 'linear-gradient(135deg, #001E94 0%, #0029BB 52%, #0B46D9 100%)',
-  greenGradient: 'linear-gradient(135deg, #7ED957 0%, #54C83F 100%)',
+  blue: '#3f4097',
+  blueDark: '#25266f',
+  blueSoft: '#eef0ff',
+  green: '#7ed957',
+  bg: '#f6f7fb',
+  text: '#172033',
+  muted: '#637083',
+  border: '#dfe3ef',
+  danger: '#c0392b',
+  warning: '#f39c12',
 };
 
 const adminPin = '0000';
@@ -323,14 +292,6 @@ function formatMoney(value?: number | null) {
   return safeValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
-function formatDate(value?: string | null) {
-  if (!value) return '-';
-  const datePart = value.slice(0, 10);
-  const [year, month, day] = datePart.split('-');
-  if (!year || !month || !day) return value;
-  return `${day}/${month}/${year}`;
-}
-
 function getProfessorName(professores: Professor[], id?: string | null) {
   return professores.find((prof) => prof.id === id)?.nome || '-';
 }
@@ -385,9 +346,6 @@ export default function Home() {
 
   const [matriculaAlunoId, setMatriculaAlunoId] = useState('');
   const [matriculaTurmaId, setMatriculaTurmaId] = useState('');
-
-  const [notice, setNotice] = useState<NoticeState | null>(null);
-  const [confirmBox, setConfirmBox] = useState<ConfirmState | null>(null);
 
   async function loadAllData() {
     setLoading(true);
@@ -460,15 +418,6 @@ export default function Home() {
     setCurrentProfessor(null);
   }
 
-  function showNotice(message: string, kind: NoticeKind = 'info', title?: string) {
-    const defaultTitle = kind === 'success' ? 'Tudo certo' : kind === 'error' ? 'Atenção' : 'Aviso';
-    setNotice({ title: title || defaultTitle, message, kind });
-  }
-
-  function showConfirm(title: string, message: string, onConfirm: () => void | Promise<void>) {
-    setConfirmBox({ title, message, onConfirm });
-  }
-
   function handleLogin() {
     setPinError('');
 
@@ -509,7 +458,7 @@ export default function Home() {
 
   async function saveStudent() {
     if (!studentForm.nome.trim()) {
-      showNotice('Preencha o nome do aluno.');
+      alert('Preencha o nome do aluno.');
       return;
     }
 
@@ -544,14 +493,14 @@ export default function Home() {
       const { error } = await supabase.from('alunos').update(payload).eq('id', editingStudentId);
 
       if (error) {
-        showNotice(`Erro ao atualizar aluno: ${error.message}`);
+        alert(`Erro ao atualizar aluno: ${error.message}`);
         return;
       }
 
       setEditingStudentId(null);
       setStudentForm(initialStudentForm);
       await loadAllData();
-      showNotice('Aluno atualizado com sucesso.');
+      alert('Aluno atualizado com sucesso.');
       return;
     }
 
@@ -562,7 +511,7 @@ export default function Home() {
       .single();
 
     if (error) {
-      showNotice(`Erro ao salvar aluno: ${error.message}`);
+      alert(`Erro ao salvar aluno: ${error.message}`);
       return;
     }
 
@@ -584,18 +533,18 @@ export default function Home() {
       });
 
       if (financeiroError) {
-        showNotice(`Aluno salvo, mas houve erro ao gerar financeiro: ${financeiroError.message}`);
+        alert(`Aluno salvo, mas houve erro ao gerar financeiro: ${financeiroError.message}`);
       }
     }
 
     setStudentForm(initialStudentForm);
     await loadAllData();
-    showNotice('Aluno salvo com sucesso.');
+    alert('Aluno salvo com sucesso.');
   }
 
   async function saveExperimental() {
     if (!experimentalForm.nome.trim()) {
-      showNotice('Preencha o nome do aluno experimental.');
+      alert('Preencha o nome do aluno experimental.');
       return;
     }
 
@@ -628,19 +577,19 @@ export default function Home() {
     const { error } = await query;
 
     if (error) {
-      showNotice(`Erro ao salvar experimental: ${error.message}`);
+      alert(`Erro ao salvar experimental: ${error.message}`);
       return;
     }
 
     setEditingExperimentalId(null);
     setExperimentalForm(initialExperimentalForm);
     await loadAllData();
-    showNotice(editingExperimentalId ? 'Experimental atualizado com sucesso.' : 'Experimental salvo com sucesso.');
+    alert(editingExperimentalId ? 'Experimental atualizado com sucesso.' : 'Experimental salvo com sucesso.');
   }
 
   async function saveTurma() {
     if (!turmaForm.nome.trim()) {
-      showNotice('Preencha o nome da turma.');
+      alert('Preencha o nome da turma.');
       return;
     }
 
@@ -663,19 +612,19 @@ export default function Home() {
     const { error } = await query;
 
     if (error) {
-      showNotice(`Erro ao salvar turma: ${error.message}`);
+      alert(`Erro ao salvar turma: ${error.message}`);
       return;
     }
 
     setEditingTurmaId(null);
     setTurmaForm(initialTurmaForm);
     await loadAllData();
-    showNotice(editingTurmaId ? 'Turma atualizada com sucesso.' : 'Turma salva com sucesso.');
+    alert(editingTurmaId ? 'Turma atualizada com sucesso.' : 'Turma salva com sucesso.');
   }
 
   async function saveMatricula() {
     if (!matriculaAlunoId || !matriculaTurmaId) {
-      showNotice('Selecione o aluno e a turma.');
+      alert('Selecione o aluno e a turma.');
       return;
     }
 
@@ -687,45 +636,19 @@ export default function Home() {
     });
 
     if (error) {
-      showNotice(`Erro ao vincular aluno à turma: ${error.message}`);
+      alert(`Erro ao vincular aluno à turma: ${error.message}`);
       return;
     }
 
     setMatriculaAlunoId('');
     setMatriculaTurmaId('');
     await loadAllData();
-    showNotice('Aluno vinculado à turma com sucesso.');
-  }
-
-  function getCurrentMonthAndDueDate() {
-    const hoje = new Date();
-    const mes = hoje.toISOString().slice(0, 7);
-    const vencimento = `${mes}-10`;
-    return { mes, vencimento };
-  }
-
-  function applyStudentToFinancialForm(alunoId: string) {
-    const aluno = alunos.find((item) => item.id === alunoId);
-    const { mes, vencimento } = getCurrentMonthAndDueDate();
-
-    setFinancialForm({
-      ...financialForm,
-      aluno_id: alunoId,
-      professor_id: aluno?.professor_id || '',
-      valor: aluno?.plano_valor ? String(aluno.plano_valor) : '',
-      vencimento,
-      mes,
-      status: 'pendente',
-      recebido: false,
-      observacao: aluno
-        ? `Mensalidade - ${aluno.plano_descricao || 'Plano do aluno'}`
-        : financialForm.observacao,
-    });
+    alert('Aluno vinculado à turma com sucesso.');
   }
 
   async function saveFinancial() {
     if (!financialForm.aluno_id || !financialForm.valor) {
-      showNotice('Selecione o aluno e informe o valor.');
+      alert('Selecione o aluno e informe o valor.');
       return;
     }
 
@@ -748,14 +671,14 @@ export default function Home() {
     const { error } = await query;
 
     if (error) {
-      showNotice(`Erro ao salvar financeiro: ${error.message}`);
+      alert(`Erro ao salvar financeiro: ${error.message}`);
       return;
     }
 
     setEditingFinancialId(null);
     setFinancialForm(initialFinancialForm);
     await loadAllData();
-    showNotice(editingFinancialId ? 'Lançamento financeiro atualizado.' : 'Lançamento financeiro salvo.');
+    alert(editingFinancialId ? 'Lançamento financeiro atualizado.' : 'Lançamento financeiro salvo.');
   }
 
   async function convertExperimentalToStudent(item: Experimental) {
@@ -786,7 +709,7 @@ export default function Home() {
     const { error } = await supabase.from('alunos').insert(payload);
 
     if (error) {
-      showNotice(`Erro ao matricular experimental: ${error.message}`);
+      alert(`Erro ao matricular experimental: ${error.message}`);
       return;
     }
 
@@ -799,7 +722,7 @@ export default function Home() {
       .eq('id', item.id);
 
     await loadAllData();
-    showNotice('Experimental convertido em aluno.');
+    alert('Experimental convertido em aluno.');
   }
 
   async function registerPresence(alunoId: string, turmaId: string, presente: boolean, tipoPresenca = 'normal') {
@@ -816,7 +739,7 @@ export default function Home() {
     });
 
     if (error) {
-      showNotice(`Erro ao salvar presença: ${error.message}`);
+      alert(`Erro ao salvar presença: ${error.message}`);
       return;
     }
 
@@ -835,7 +758,7 @@ export default function Home() {
       .eq('id', item.id);
 
     if (error) {
-      showNotice(`Erro ao atualizar pagamento: ${error.message}`);
+      alert(`Erro ao atualizar pagamento: ${error.message}`);
       return;
     }
 
@@ -843,260 +766,150 @@ export default function Home() {
   }
 
   async function deleteRecord(table: string, id: string) {
-    showConfirm('Confirmar exclusão', 'Tem certeza que deseja excluir este registro? Essa ação não pode ser desfeita.', async () => {
-      setConfirmBox(null);
+    const confirmDelete = window.confirm('Tem certeza que deseja excluir este registro?');
+    if (!confirmDelete) return;
 
-      const { error } = await supabase.from(table).delete().eq('id', id);
+    const { error } = await supabase.from(table).delete().eq('id', id);
 
-      if (error) {
-        showNotice(`Erro ao excluir: ${error.message}`, 'error');
-        return;
-      }
+    if (error) {
+      alert(`Erro ao excluir: ${error.message}`);
+      return;
+    }
 
-      await loadAllData();
-      showNotice('Registro excluído com sucesso.', 'success');
-    });
+    await loadAllData();
   }
 
   function inputStyle() {
     return {
-      height: 46,
-      borderRadius: 16,
+      height: 42,
+      borderRadius: 12,
       border: `1px solid ${COLORS.border}`,
-      padding: '0 14px',
+      padding: '0 12px',
       fontSize: 14,
-      background: COLORS.surface,
-      color: COLORS.text,
-      outline: 'none',
-      boxShadow: 'inset 0 1px 0 rgba(255,255,255,0.9)',
+      background: '#fff',
     };
   }
 
   function textareaStyle() {
     return {
-      minHeight: 92,
-      borderRadius: 16,
+      minHeight: 80,
+      borderRadius: 12,
       border: `1px solid ${COLORS.border}`,
-      padding: 14,
+      padding: 12,
       fontSize: 14,
-      background: COLORS.surface,
-      color: COLORS.text,
-      outline: 'none',
+      background: '#fff',
       resize: 'vertical' as const,
     };
   }
 
   function primaryButtonStyle() {
     return {
-      minHeight: 46,
-      padding: '0 20px',
-      borderRadius: 16,
+      height: 44,
+      padding: '0 18px',
+      borderRadius: 14,
       border: 'none',
-      background: COLORS.gradient,
+      background: COLORS.blue,
       color: '#fff',
-      fontWeight: 900,
+      fontWeight: 800,
       cursor: 'pointer',
-      boxShadow: '0 12px 28px rgba(0, 30, 148, 0.24)',
-      letterSpacing: 0.2,
     };
   }
 
   function secondaryButtonStyle() {
     return {
-      minHeight: 42,
-      padding: '0 16px',
-      borderRadius: 14,
+      height: 40,
+      padding: '0 14px',
+      borderRadius: 12,
       border: `1px solid ${COLORS.border}`,
-      background: COLORS.surface,
-      color: COLORS.blueDark,
-      fontWeight: 800,
+      background: '#fff',
+      color: COLORS.text,
+      fontWeight: 700,
       cursor: 'pointer',
-      boxShadow: '0 8px 18px rgba(15, 23, 42, 0.05)',
     };
   }
 
   function activeButtonStyle(active: boolean) {
     return {
-      minHeight: 42,
-      padding: '0 16px',
+      height: 40,
+      padding: '0 14px',
       borderRadius: 999,
       border: `1px solid ${active ? COLORS.blue : COLORS.border}`,
-      background: active ? COLORS.gradient : 'rgba(255,255,255,0.86)',
-      color: active ? '#fff' : COLORS.blueDark,
-      fontWeight: 900,
+      background: active ? COLORS.blue : '#fff',
+      color: active ? '#fff' : COLORS.text,
+      fontWeight: 800,
       cursor: 'pointer',
-      boxShadow: active ? '0 12px 28px rgba(0, 30, 148, 0.22)' : '0 8px 20px rgba(15, 23, 42, 0.05)',
-      letterSpacing: 0.2,
     };
   }
 
   const cardStyle = {
-    background: 'rgba(255,255,255,0.92)',
-    borderRadius: 28,
+    background: '#fff',
+    borderRadius: 24,
     border: `1px solid ${COLORS.border}`,
-    padding: 24,
-    boxShadow: COLORS.shadow,
-    backdropFilter: 'blur(10px)',
-  };
-
-  const premiumCardHeaderStyle = {
-    background: COLORS.gradient,
-    color: '#fff',
-    padding: '24px 30px',
-    fontSize: 24,
-    fontWeight: 950,
-    letterSpacing: 0.6,
+    padding: 20,
+    boxShadow: '0 10px 30px rgba(20, 24, 60, 0.06)',
   };
 
   const thStyle = {
     textAlign: 'left' as const,
-    padding: '13px 12px',
+    padding: 10,
     fontSize: 12,
     color: COLORS.blueDark,
-    background: 'linear-gradient(180deg, #F1F5FF 0%, #E8EEFF 100%)',
+    background: COLORS.blueSoft,
     borderBottom: `1px solid ${COLORS.border}`,
     whiteSpace: 'nowrap' as const,
-    textTransform: 'uppercase' as const,
-    letterSpacing: 0.5,
   };
 
   const tdStyle = {
-    padding: '13px 12px',
+    padding: 10,
     fontSize: 13,
     borderBottom: `1px solid ${COLORS.border}`,
     verticalAlign: 'top' as const,
-    color: COLORS.text,
   };
-
-  const sectionGridStyle = {
-    display: 'grid',
-    gap: 20,
-  };
-
-  const pageShellStyle = {
-    minHeight: '100vh',
-    background:
-      'radial-gradient(circle at 10% 0%, rgba(126, 217, 87, 0.20), transparent 28%), radial-gradient(circle at 90% 5%, rgba(0, 41, 187, 0.14), transparent 32%), #F4F7FB',
-    padding: 24,
-  };
-
-  function renderFeedbackModal() {
-    if (!notice && !confirmBox) return null;
-
-    const activeNotice = notice;
-    const activeConfirm = confirmBox;
-    const isError = activeNotice?.kind === 'error';
-    const isSuccess = activeNotice?.kind === 'success';
-
-    return (
-      <div
-        style={{
-          position: 'fixed',
-          inset: 0,
-          zIndex: 9999,
-          background: 'rgba(7, 19, 92, 0.35)',
-          display: 'flex',
-          alignItems: 'center',
-          justifyContent: 'center',
-          padding: 20,
-        }}
-      >
-        <div
-          style={{
-            width: '100%',
-            maxWidth: 460,
-            background: '#fff',
-            borderRadius: 26,
-            boxShadow: COLORS.shadowStrong,
-            border: `1px solid ${COLORS.border}`,
-            overflow: 'hidden',
-          }}
-        >
-          <div
-            style={{
-              padding: 20,
-              background: activeConfirm ? COLORS.gradient : isSuccess ? COLORS.greenGradient : isError ? COLORS.danger : COLORS.gradient,
-              color: '#fff',
-              fontWeight: 900,
-              fontSize: 18,
-            }}
-          >
-            {activeConfirm?.title || activeNotice?.title}
-          </div>
-
-          <div style={{ padding: 22 }}>
-            <p style={{ margin: 0, color: COLORS.text, lineHeight: 1.5, fontSize: 15 }}>
-              {activeConfirm?.message || activeNotice?.message}
-            </p>
-
-            <div style={{ display: 'flex', gap: 10, justifyContent: 'flex-end', marginTop: 22 }}>
-              {activeConfirm ? (
-                <>
-                  <button style={secondaryButtonStyle()} onClick={() => setConfirmBox(null)}>
-                    Cancelar
-                  </button>
-                  <button style={primaryButtonStyle()} onClick={() => activeConfirm.onConfirm()}>
-                    Confirmar
-                  </button>
-                </>
-              ) : (
-                <button style={primaryButtonStyle()} onClick={() => setNotice(null)}>
-                  Entendi
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      </div>
-    );
-  }
 
   function renderLogin() {
     return (
-      <main style={pageShellStyle}>
-        {renderFeedbackModal()}
-        <div style={{ maxWidth: 1220, margin: '0 auto', display: 'grid', gap: 28, gridTemplateColumns: '1.05fr 0.95fr', alignItems: 'stretch' }}>
-          <section style={{ ...cardStyle, padding: 0, overflow: 'hidden', boxShadow: COLORS.shadowStrong }}>
-            <div style={premiumCardHeaderStyle}>
+      <main style={{ minHeight: '100vh', background: COLORS.bg, padding: 24 }}>
+        <div style={{ maxWidth: 1180, margin: '0 auto', display: 'grid', gap: 24, gridTemplateColumns: '1fr 1fr' }}>
+          <section style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+            <div style={{ background: COLORS.blue, color: '#fff', padding: '22px 28px', fontSize: 26, fontWeight: 900 }}>
               GESTOR CONEXÃO
             </div>
 
-            <div style={{ padding: 34 }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: COLORS.blueSoft, color: COLORS.blue, padding: '8px 12px', borderRadius: 999, fontWeight: 900, fontSize: 12, marginBottom: 18 }}>
-                <span style={{ width: 8, height: 8, borderRadius: 999, background: COLORS.green, display: 'inline-block' }} />
-                OPERAÇÃO PREMIUM DO CT
-              </div>
-
-              <h1 style={{ margin: 0, color: COLORS.blueDark, fontSize: 46, lineHeight: 1.04, letterSpacing: -1.2 }}>
+            <div style={{ padding: 28 }}>
+              <h1 style={{ margin: 0, color: COLORS.blue, fontSize: 42, lineHeight: 1.08 }}>
                 Operação diária do CT em um só lugar
               </h1>
 
-              <p style={{ color: COLORS.muted, fontSize: 18, lineHeight: 1.6, marginTop: 18 }}>
-                Professores, recepção e administração com acessos separados por PIN, dados integrados e fluxo operacional rápido.
+              <p style={{ color: COLORS.muted, fontSize: 18, lineHeight: 1.5 }}>
+                Professores, recepção e administração com acessos separados por PIN.
               </p>
 
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 14, marginTop: 28 }}>
-                {[
-                  ['Admin', 'Gestão completa, financeiro e visão geral.'],
-                  ['Recepção', 'Alunos, experimentais, turmas e matrículas.'],
-                  ['Professor', 'Turmas, presença e espelho financeiro.'],
-                ].map(([title, desc]) => (
-                  <div key={title} style={{ background: COLORS.surfaceSoft, border: `1px solid ${COLORS.border}`, borderRadius: 22, padding: 18, boxShadow: '0 10px 26px rgba(15, 23, 42, 0.05)' }}>
-                    <strong style={{ color: COLORS.blue, fontSize: 17 }}>{title}</strong>
-                    <p style={{ color: COLORS.muted, marginBottom: 0, lineHeight: 1.45 }}>{desc}</p>
-                  </div>
-                ))}
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginTop: 24 }}>
+                <div style={{ background: COLORS.blueSoft, borderRadius: 18, padding: 16 }}>
+                  <strong style={{ color: COLORS.blue }}>Admin</strong>
+                  <p style={{ color: COLORS.muted, marginBottom: 0 }}>Gestão completa.</p>
+                </div>
+
+                <div style={{ background: COLORS.blueSoft, borderRadius: 18, padding: 16 }}>
+                  <strong style={{ color: COLORS.blue }}>Recepção</strong>
+                  <p style={{ color: COLORS.muted, marginBottom: 0 }}>Alunos e leads.</p>
+                </div>
+
+                <div style={{ background: COLORS.blueSoft, borderRadius: 18, padding: 16 }}>
+                  <strong style={{ color: COLORS.blue }}>Professor</strong>
+                  <p style={{ color: COLORS.muted, marginBottom: 0 }}>Turmas e presença.</p>
+                </div>
               </div>
             </div>
           </section>
 
-          <section style={{ ...cardStyle, padding: 0, overflow: 'hidden', boxShadow: COLORS.shadowStrong }}>
-            <div style={premiumCardHeaderStyle}>
+          <section style={{ ...cardStyle, padding: 0, overflow: 'hidden' }}>
+            <div style={{ background: COLORS.blue, color: '#fff', padding: '22px 28px', fontSize: 26, fontWeight: 900 }}>
               ENTRAR
             </div>
 
-            <div style={{ padding: 34 }}>
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 24 }}>
+            <div style={{ padding: 28 }}>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 20 }}>
                 <button style={activeButtonStyle(loginTab === 'admin')} onClick={() => setLoginTab('admin')}>
                   ADMIN
                 </button>
@@ -1108,26 +921,23 @@ export default function Home() {
                 </button>
               </div>
 
-              <label style={{ fontWeight: 900, color: COLORS.blueDark }}>PIN de acesso</label>
+              <label style={{ fontWeight: 800, color: COLORS.text }}>PIN de acesso</label>
               <input
                 value={pin}
                 onChange={(e) => setPin(onlyDigits(e.target.value).slice(0, 4))}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter') handleLogin();
-                }}
                 placeholder="Digite o PIN"
-                style={{ ...inputStyle(), width: '100%', marginTop: 10, height: 52, fontSize: 16 }}
+                style={{ ...inputStyle(), width: '100%', marginTop: 8 }}
               />
 
-              {pinError ? <p style={{ color: COLORS.danger, fontWeight: 900 }}>{pinError}</p> : null}
+              {pinError ? <p style={{ color: COLORS.danger, fontWeight: 800 }}>{pinError}</p> : null}
 
-              <button onClick={handleLogin} style={{ ...primaryButtonStyle(), width: '100%', marginTop: 18, height: 54 }}>
+              <button onClick={handleLogin} style={{ ...primaryButtonStyle(), width: '100%', marginTop: 16 }}>
                 Entrar com PIN
               </button>
 
-              <div style={{ marginTop: 22, padding: 14, borderRadius: 16, background: COLORS.blueSoft, color: COLORS.muted, fontSize: 13, lineHeight: 1.45 }}>
+              <p style={{ color: COLORS.muted, marginTop: 18, fontSize: 13 }}>
                 Admin: 0000 • Recepção: 9999 • Professores: PIN cadastrado no Supabase
-              </div>
+              </p>
             </div>
           </section>
         </div>
@@ -1135,32 +945,26 @@ export default function Home() {
     );
   }
 
-
   function renderPanelHeader() {
     return (
-      <header style={{ ...cardStyle, padding: 0, overflow: 'hidden', boxShadow: COLORS.shadowStrong }}>
-        <div style={{ height: 8, background: COLORS.greenGradient }} />
-        <div style={{ padding: 28, display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 18, flexWrap: 'wrap' }}>
+      <header style={cardStyle}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 16, flexWrap: 'wrap' }}>
           <div>
             <div
               style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 8,
-                padding: '7px 13px',
+                display: 'inline-block',
+                padding: '6px 12px',
                 borderRadius: 999,
                 background: COLORS.blueSoft,
                 color: COLORS.blue,
-                fontWeight: 950,
+                fontWeight: 900,
                 fontSize: 12,
-                letterSpacing: 0.5,
               }}
             >
-              <span style={{ width: 8, height: 8, borderRadius: 999, background: COLORS.green, display: 'inline-block' }} />
               GESTOR CONEXÃO
             </div>
 
-            <h1 style={{ margin: '12px 0 0', color: COLORS.blueDark, fontSize: 34, letterSpacing: -0.8 }}>
+            <h1 style={{ margin: '10px 0 0', color: COLORS.blue }}>
               {screen === 'admin'
                 ? 'Painel Administrativo'
                 : screen === 'reception'
@@ -1168,7 +972,7 @@ export default function Home() {
                   : `Professor: ${currentProfessor?.nome || ''}`}
             </h1>
 
-            {loading ? <p style={{ color: COLORS.muted, marginBottom: 0 }}>Atualizando dados...</p> : null}
+            {loading ? <p style={{ color: COLORS.muted }}>Atualizando dados...</p> : null}
           </div>
 
           <button onClick={logout} style={secondaryButtonStyle()}>
@@ -1178,7 +982,6 @@ export default function Home() {
       </header>
     );
   }
-
 
   function renderTabs() {
     if (screen === 'admin') {
@@ -1202,7 +1005,6 @@ export default function Home() {
           <button style={activeButtonStyle(receptionTab === 'students')} onClick={() => setReceptionTab('students')}>Alunos</button>
           <button style={activeButtonStyle(receptionTab === 'classes')} onClick={() => setReceptionTab('classes')}>Turmas</button>
           <button style={activeButtonStyle(receptionTab === 'enrollments')} onClick={() => setReceptionTab('enrollments')}>Matrículas</button>
-          <button style={activeButtonStyle(receptionTab === 'attendance')} onClick={() => setReceptionTab('attendance')}>Presenças</button>
         </div>
       );
     }
@@ -1216,30 +1018,64 @@ export default function Home() {
     );
   }
 
-  function renderDashboard() {
-    const cards = [
-      ['Alunos ativos', activeAlunos.length, 'base de alunos em operação'],
-      ['Experimentais', experimentais.length, 'leads e aulas teste'],
-      ['Turmas ativas', activeTurmas.length, 'turmas abertas no CT'],
-      ['Recebido', formatMoney(totalRecebido), `Total lançado: ${formatMoney(totalReceber)}`],
-    ];
 
+  const financialSummary = useMemo(() => {
+    const totalRecebido = financeiro
+      .filter((item) => item.recebido)
+      .reduce((acc, item) => acc + Number(item.valor || 0), 0);
+
+    const totalPendente = financeiro
+      .filter((item) => !item.recebido)
+      .reduce((acc, item) => acc + Number(item.valor || 0), 0);
+
+    const totalArena = financeiro.reduce((acc, item) => {
+      const professor = professores.find((prof) => prof.id === item.professor_id);
+      const percentualProfessor = professor?.percentual || 0;
+      const valor = Number(item.valor || 0);
+
+      return acc + (valor - (valor * percentualProfessor) / 100);
+    }, 0);
+
+    const totalProfessores = financeiro.reduce((acc, item) => {
+      const professor = professores.find((prof) => prof.id === item.professor_id);
+      const percentualProfessor = professor?.percentual || 0;
+      const valor = Number(item.valor || 0);
+
+      return acc + (valor * percentualProfessor) / 100;
+    }, 0);
+
+    return {
+      totalRecebido,
+      totalPendente,
+      totalArena,
+      totalProfessores,
+    };
+  }, [financeiro, professores]);
+
+
+  function renderDashboard() {
     return (
-      <section style={{ display: 'grid', gap: 18, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-        {cards.map(([title, value, desc]) => (
-          <div key={title} style={{ ...cardStyle, position: 'relative', overflow: 'hidden' }}>
-            <div style={{ position: 'absolute', top: 0, right: 0, width: 90, height: 90, borderRadius: '0 0 0 90px', background: 'rgba(126, 217, 87, 0.18)' }} />
-            <strong style={{ color: COLORS.muted, fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.5 }}>{title}</strong>
-            <h2 style={{ color: COLORS.blueDark, fontSize: typeof value === 'number' ? 42 : 28, margin: '18px 0 6px', letterSpacing: -1 }}>
-              {value}
-            </h2>
-            <p style={{ color: COLORS.muted, margin: 0 }}>{desc}</p>
-          </div>
-        ))}
+      <section style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+        <div style={cardStyle}>
+          <strong style={{ color: COLORS.muted }}>Alunos ativos</strong>
+          <h2 style={{ color: COLORS.blue, fontSize: 34 }}>{activeAlunos.length}</h2>
+        </div>
+        <div style={cardStyle}>
+          <strong style={{ color: COLORS.muted }}>Experimentais</strong>
+          <h2 style={{ color: COLORS.blue, fontSize: 34 }}>{experimentais.length}</h2>
+        </div>
+        <div style={cardStyle}>
+          <strong style={{ color: COLORS.muted }}>Turmas ativas</strong>
+          <h2 style={{ color: COLORS.blue, fontSize: 34 }}>{activeTurmas.length}</h2>
+        </div>
+        <div style={cardStyle}>
+          <strong style={{ color: COLORS.muted }}>Recebido</strong>
+          <h2 style={{ color: COLORS.blue, fontSize: 26 }}>{formatMoney(totalRecebido)}</h2>
+          <p style={{ color: COLORS.muted, margin: 0 }}>Total lançado: {formatMoney(totalReceber)}</p>
+        </div>
       </section>
     );
   }
-
 
   function renderStudents() {
     return (
@@ -1247,7 +1083,7 @@ export default function Home() {
         <div style={cardStyle}>
           <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Cadastro de alunos</h2>
 
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, 1fr)' }}>
             <input style={inputStyle()} placeholder="Nome completo" value={studentForm.nome} onChange={(e) => setStudentForm({ ...studentForm, nome: e.target.value })} />
             <input style={inputStyle()} placeholder="Celular" value={studentForm.telefone} onChange={(e) => setStudentForm({ ...studentForm, telefone: maskPhone(e.target.value) })} />
             <input style={inputStyle()} placeholder="E-mail" value={studentForm.email} onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })} />
@@ -1357,7 +1193,6 @@ export default function Home() {
                   <th style={thStyle}>Plano</th>
                   <th style={thStyle}>Valor</th>
                   <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Cadastro</th>
                   <th style={thStyle}>Ação</th>
                 </tr>
               </thead>
@@ -1370,7 +1205,6 @@ export default function Home() {
                     <td style={tdStyle}>{aluno.tipo_plano === 'personalizado' ? 'Personalizado' : aluno.plano_descricao || '-'}</td>
                     <td style={tdStyle}>{formatMoney(aluno.plano_valor)}</td>
                     <td style={tdStyle}>{aluno.status || 'ativo'}</td>
-                    <td style={tdStyle}>{formatDate(aluno.created_at)}</td>
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
                         <button
@@ -1422,7 +1256,7 @@ export default function Home() {
         <div style={cardStyle}>
           <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Cadastro de experimentais</h2>
 
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, 1fr)' }}>
             <input style={inputStyle()} placeholder="Nome do aluno" value={experimentalForm.nome} onChange={(e) => setExperimentalForm({ ...experimentalForm, nome: e.target.value })} />
             <input style={inputStyle()} placeholder="Celular" value={experimentalForm.telefone} onChange={(e) => setExperimentalForm({ ...experimentalForm, telefone: maskPhone(e.target.value) })} />
             <input style={inputStyle()} placeholder="E-mail" value={experimentalForm.email} onChange={(e) => setExperimentalForm({ ...experimentalForm, email: e.target.value })} />
@@ -1455,8 +1289,8 @@ export default function Home() {
 
             <input style={inputStyle()} placeholder="Dia preferido" value={experimentalForm.dia_preferido} onChange={(e) => setExperimentalForm({ ...experimentalForm, dia_preferido: e.target.value })} />
             <input style={inputStyle()} placeholder="Período preferido" value={experimentalForm.periodo_preferido} onChange={(e) => setExperimentalForm({ ...experimentalForm, periodo_preferido: e.target.value })} />
-            <input style={inputStyle()} type="time" title="Horário que pode fazer" value={experimentalForm.horario_pode_fazer} onChange={(e) => setExperimentalForm({ ...experimentalForm, horario_pode_fazer: e.target.value })} />
-            <input style={inputStyle()} type="datetime-local" title="Dia e horário da aula experimental" value={experimentalForm.dia_horario_aula_experimental} onChange={(e) => setExperimentalForm({ ...experimentalForm, dia_horario_aula_experimental: e.target.value })} />
+            <input style={inputStyle()} placeholder="Horário que pode fazer" value={experimentalForm.horario_pode_fazer} onChange={(e) => setExperimentalForm({ ...experimentalForm, horario_pode_fazer: e.target.value })} />
+            <input style={inputStyle()} placeholder="Dia e horário da aula experimental" value={experimentalForm.dia_horario_aula_experimental} onChange={(e) => setExperimentalForm({ ...experimentalForm, dia_horario_aula_experimental: e.target.value })} />
 
             <select style={inputStyle()} value={experimentalForm.status_lead} onChange={(e) => setExperimentalForm({ ...experimentalForm, status_lead: e.target.value })}>
               <option value="novo">Novo</option>
@@ -1598,7 +1432,7 @@ export default function Home() {
         <div style={cardStyle}>
           <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Cadastro de turmas</h2>
 
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, 1fr)' }}>
             <input style={inputStyle()} placeholder="Nome da turma" value={turmaForm.nome} onChange={(e) => setTurmaForm({ ...turmaForm, nome: e.target.value })} />
 
             <select style={inputStyle()} value={turmaForm.modalidade} onChange={(e) => setTurmaForm({ ...turmaForm, modalidade: e.target.value })}>
@@ -1626,7 +1460,7 @@ export default function Home() {
               <option value="domingo">Domingo</option>
             </select>
 
-            <input style={inputStyle()} type="time" title="Horário" value={turmaForm.horario} onChange={(e) => setTurmaForm({ ...turmaForm, horario: e.target.value })} />
+            <input style={inputStyle()} placeholder="Horário" value={turmaForm.horario} onChange={(e) => setTurmaForm({ ...turmaForm, horario: e.target.value })} />
             <input style={inputStyle()} placeholder="Quadra" value={turmaForm.quadra} onChange={(e) => setTurmaForm({ ...turmaForm, quadra: e.target.value })} />
             <input style={inputStyle()} placeholder="Capacidade" type="number" value={turmaForm.capacidade} onChange={(e) => setTurmaForm({ ...turmaForm, capacidade: e.target.value })} />
           </div>
@@ -1757,7 +1591,6 @@ export default function Home() {
                   <th style={thStyle}>Turma</th>
                   <th style={thStyle}>Tipo</th>
                   <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Cadastro</th>
                   <th style={thStyle}>Ação</th>
                 </tr>
               </thead>
@@ -1822,8 +1655,8 @@ export default function Home() {
         <div style={cardStyle}>
           <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Lançamento financeiro</h2>
 
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-            <select style={inputStyle()} value={financialForm.aluno_id} onChange={(e) => applyStudentToFinancialForm(e.target.value)}>
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+            <select style={inputStyle()} value={financialForm.aluno_id} onChange={(e) => setFinancialForm({ ...financialForm, aluno_id: e.target.value })}>
               <option value="">Aluno</option>
               {alunos.map((aluno) => (
                 <option key={aluno.id} value={aluno.id}>{aluno.nome}</option>
@@ -1877,6 +1710,28 @@ export default function Home() {
                 Cancelar edição
               </button>
             ) : null}
+          </div>
+        </div>
+
+        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          <div style={cardStyle}>
+            <h3 style={{ marginTop: 0, color: COLORS.blue }}>Total recebido</h3>
+            <p style={{ fontSize: 28, fontWeight: 800 }}>{formatMoney(financialSummary.totalRecebido)}</p>
+          </div>
+
+          <div style={cardStyle}>
+            <h3 style={{ marginTop: 0, color: COLORS.blue }}>Total pendente</h3>
+            <p style={{ fontSize: 28, fontWeight: 800 }}>{formatMoney(financialSummary.totalPendente)}</p>
+          </div>
+
+          <div style={cardStyle}>
+            <h3 style={{ marginTop: 0, color: COLORS.blue }}>Comissão professores</h3>
+            <p style={{ fontSize: 28, fontWeight: 800 }}>{formatMoney(financialSummary.totalProfessores)}</p>
+          </div>
+
+          <div style={cardStyle}>
+            <h3 style={{ marginTop: 0, color: COLORS.blue }}>Parte da arena</h3>
+            <p style={{ fontSize: 28, fontWeight: 800 }}>{formatMoney(financialSummary.totalArena)}</p>
           </div>
         </div>
 
@@ -2146,7 +2001,6 @@ export default function Home() {
       if (receptionTab === 'experimentals') return renderExperimentals();
       if (receptionTab === 'classes') return renderClasses();
       if (receptionTab === 'enrollments') return renderEnrollments();
-      if (receptionTab === 'attendance') return renderAttendance();
     }
 
     if (screen === 'teacher') {
@@ -2163,9 +2017,8 @@ export default function Home() {
   }
 
   return (
-    <main style={pageShellStyle}>
-      {renderFeedbackModal()}
-      <div style={{ maxWidth: 1420, margin: '0 auto', display: 'grid', gap: 22 }}>
+    <main style={{ minHeight: '100vh', background: COLORS.bg, padding: 24 }}>
+      <div style={{ maxWidth: 1380, margin: '0 auto', display: 'grid', gap: 20 }}>
         {renderPanelHeader()}
         {renderTabs()}
         {renderCurrentContent()}
