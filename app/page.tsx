@@ -197,6 +197,65 @@ const COLORS = {
 const adminPin = '0000';
 const receptionPin = '9999';
 
+const TIMEZONE = 'America/Sao_Paulo';
+
+const BEACH_CATEGORIES = [
+  'Iniciante 1',
+  'Iniciante 2',
+  'Intermediário 1',
+  'Intermediário 2',
+  'Avançado 1',
+  'Avançado 2',
+  'Infanto/Juvenil',
+];
+
+const FUTE_CATEGORIES = [
+  'Aprendiz',
+  'Iniciante',
+  'Intermediário',
+  'Avançado',
+  'Infanto/Juvenil',
+];
+
+const CLASS_TIMES = [
+  '06:00', '07:00', '08:00', '09:00', '10:00', '11:00',
+  '12:00', '13:00', '14:00', '15:00', '16:00', '17:00',
+  '18:00', '19:00', '20:00', '21:00', '22:00',
+];
+
+const COURTS = ['Quadra 1', 'Quadra 2', 'Quadra 3'];
+
+function dateBR() {
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: TIMEZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  }).formatToParts(new Date());
+
+  const year = parts.find((part) => part.type === 'year')?.value || '';
+  const month = parts.find((part) => part.type === 'month')?.value || '';
+  const day = parts.find((part) => part.type === 'day')?.value || '';
+
+  return `${year}-${month}-${day}`;
+}
+
+function monthBR() {
+  return dateBR().slice(0, 7);
+}
+
+function categoryOptions(modalidade?: string | null) {
+  return modalidade === 'Futevôlei' ? FUTE_CATEGORIES : BEACH_CATEGORIES;
+}
+
+function normalizeText(value?: string | null) {
+  return (value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
+
+function modalityFromPlan(descricao?: string | null) {
+  return normalizeText(descricao).includes('fute') ? 'Futevôlei' : 'Beach Tennis';
+}
+
 const initialStudentForm: StudentForm = {
   nome: '',
   telefone: '',
@@ -205,7 +264,7 @@ const initialStudentForm: StudentForm = {
   data_nascimento: '',
   endereco: '',
   cep: '',
-  data_inicio: new Date().toISOString().slice(0, 10),
+  data_inicio: dateBR(),
   status: 'ativo',
   tipo_plano: 'padrao',
   plano_descricao: '1x por semana',
@@ -228,7 +287,7 @@ const initialExperimentalForm: ExperimentalForm = {
   categoria: '',
   professor_id: '',
   professor_preferencia: '',
-  dia_contato: new Date().toISOString().slice(0, 10),
+  dia_contato: dateBR(),
   dia_preferido: '',
   periodo_preferido: '',
   horario_pode_fazer: '',
@@ -257,8 +316,8 @@ const initialFinancialForm: FinancialForm = {
   aluno_id: '',
   professor_id: '',
   valor: '',
-  vencimento: new Date().toISOString().slice(0, 10),
-  mes: new Date().toISOString().slice(0, 7),
+  vencimento: dateBR(),
+  mes: monthBR(),
   recebido: false,
   forma_pagamento: '',
   status: 'pendente',
@@ -351,6 +410,7 @@ export default function Home() {
 
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' | 'info' } | null>(null);
   const [confirmBox, setConfirmBox] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null);
+  const [selectedAlunoId, setSelectedAlunoId] = useState<string | null>(null);
 
   function notify(message: string, type: 'success' | 'error' | 'info' = 'info') {
     setToast({ message, type });
@@ -424,6 +484,50 @@ export default function Home() {
       .filter((item) => item.recebido)
       .reduce((sum, item) => sum + Number(item.valor || 0), 0);
   }, [financeiro]);
+
+  const professoresAtivos = useMemo(() => {
+    return professores.filter((professor) => {
+      if (professor.ativo === false) return false;
+      const nome = normalizeText(professor.nome);
+      return !nome.includes('joao jose') && !nome.includes('joão josé');
+    });
+  }, [professores]);
+
+  function professoresPorModalidade(modalidade?: string | null) {
+    const alvo = normalizeText(modalidade || '');
+    if (!alvo) return professoresAtivos;
+
+    return professoresAtivos.filter((professor) => {
+      const esporte = normalizeText(professor.esporte);
+      if (alvo.includes('fute')) return esporte.includes('fute');
+      if (alvo.includes('beach')) return esporte.includes('beach');
+      return true;
+    });
+  }
+
+  const alunosPorProfessor = useMemo(() => {
+    const grupos: { professorId: string; professorNome: string; alunos: Aluno[] }[] = [];
+
+    professoresAtivos.forEach((professor) => {
+      grupos.push({
+        professorId: professor.id,
+        professorNome: professor.nome,
+        alunos: alunos
+          .filter((aluno) => aluno.professor_id === professor.id)
+          .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')),
+      });
+    });
+
+    const semProfessor = alunos
+      .filter((aluno) => !aluno.professor_id || !professoresAtivos.some((prof) => prof.id === aluno.professor_id))
+      .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'));
+
+    if (semProfessor.length > 0) {
+      grupos.push({ professorId: 'sem-professor', professorNome: 'Sem professor definido', alunos: semProfessor });
+    }
+
+    return grupos.filter((grupo) => grupo.alunos.length > 0);
+  }, [alunos, professoresAtivos]);
 
   function logout() {
     setScreen('login');
@@ -704,7 +808,7 @@ export default function Home() {
       data_nascimento: null,
       endereco: null,
       cep: null,
-      data_inicio: new Date().toISOString().slice(0, 10),
+      data_inicio: dateBR(),
       tipo: 'fixo',
       status: 'ativo',
       tipo_plano: 'padrao',
@@ -746,7 +850,7 @@ export default function Home() {
       aluno_id: alunoId,
       turma_id: turmaId,
       professor_id: turma?.professor_id || currentProfessor?.id || null,
-      data_aula: new Date().toISOString().slice(0, 10),
+      data_aula: dateBR(),
       presente,
       tipo_presenca: tipoPresenca,
       observacao: null,
@@ -1113,14 +1217,20 @@ export default function Home() {
             <input style={inputStyle()} placeholder="Celular" value={studentForm.telefone} onChange={(e) => setStudentForm({ ...studentForm, telefone: maskPhone(e.target.value) })} />
             <input style={inputStyle()} placeholder="E-mail" value={studentForm.email} onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })} />
             <input style={inputStyle()} placeholder="CPF" value={studentForm.cpf} onChange={(e) => setStudentForm({ ...studentForm, cpf: maskCPF(e.target.value) })} />
-            <input style={inputStyle()} type="date" value={studentForm.data_nascimento} onChange={(e) => setStudentForm({ ...studentForm, data_nascimento: e.target.value })} />
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: COLORS.muted, marginBottom: 6 }}>Data de nascimento</label>
+              <input style={{ ...inputStyle(), width: '100%' }} type="date" value={studentForm.data_nascimento} onChange={(e) => setStudentForm({ ...studentForm, data_nascimento: e.target.value })} />
+            </div>
             <input style={inputStyle()} placeholder="Endereço" value={studentForm.endereco} onChange={(e) => setStudentForm({ ...studentForm, endereco: e.target.value })} />
             <input style={inputStyle()} placeholder="CEP" value={studentForm.cep} onChange={(e) => setStudentForm({ ...studentForm, cep: maskCEP(e.target.value) })} />
-            <input style={inputStyle()} type="date" value={studentForm.data_inicio} onChange={(e) => setStudentForm({ ...studentForm, data_inicio: e.target.value })} />
+            <div>
+              <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: COLORS.muted, marginBottom: 6 }}>Data de início no CT</label>
+              <input style={{ ...inputStyle(), width: '100%' }} type="date" value={studentForm.data_inicio} onChange={(e) => setStudentForm({ ...studentForm, data_inicio: e.target.value })} />
+            </div>
 
             <select style={inputStyle()} value={studentForm.professor_id} onChange={(e) => setStudentForm({ ...studentForm, professor_id: e.target.value })}>
               <option value="">Professor principal</option>
-              {professores.map((prof) => (
+              {professoresPorModalidade(modalityFromPlan(studentForm.plano_descricao)).map((prof) => (
                 <option key={prof.id} value={prof.id}>{prof.nome}</option>
               ))}
             </select>
@@ -1205,8 +1315,25 @@ export default function Home() {
           </div>
         </div>
 
+        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          <div style={cardStyle}>
+            <strong style={{ color: COLORS.muted }}>Total de alunos</strong>
+            <h2 style={{ color: COLORS.blue, fontSize: 32 }}>{alunos.length}</h2>
+          </div>
+          <div style={cardStyle}>
+            <strong style={{ color: COLORS.muted }}>Alunos ativos</strong>
+            <h2 style={{ color: COLORS.blue, fontSize: 32 }}>{activeAlunos.length}</h2>
+          </div>
+          {alunosPorProfessor.map((grupo) => (
+            <div key={grupo.professorId} style={cardStyle}>
+              <strong style={{ color: COLORS.muted }}>{grupo.professorNome}</strong>
+              <h2 style={{ color: COLORS.blue, fontSize: 32 }}>{grupo.alunos.length}</h2>
+            </div>
+          ))}
+        </div>
+
         <div style={cardStyle}>
-          <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Alunos cadastrados</h2>
+          <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Alunos cadastrados por professor</h2>
 
           <div style={{ overflowX: 'auto' }}>
             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -1222,50 +1349,67 @@ export default function Home() {
                 </tr>
               </thead>
               <tbody>
-                {alunos.map((aluno) => (
-                  <tr key={aluno.id}>
-                    <td style={tdStyle}>{aluno.nome}</td>
-                    <td style={tdStyle}>{aluno.telefone || '-'}</td>
-                    <td style={tdStyle}>{getProfessorName(professores, aluno.professor_id)}</td>
-                    <td style={tdStyle}>{aluno.tipo_plano === 'personalizado' ? 'Personalizado' : aluno.plano_descricao || '-'}</td>
-                    <td style={tdStyle}>{formatMoney(aluno.plano_valor)}</td>
-                    <td style={tdStyle}>{aluno.status || 'ativo'}</td>
-                    <td style={tdStyle}>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button
-                          style={secondaryButtonStyle()}
-                          onClick={() => {
-                            setEditingStudentId(aluno.id);
-                            setStudentForm({
-                              nome: aluno.nome || '',
-                              telefone: aluno.telefone || '',
-                              email: aluno.email || '',
-                              cpf: aluno.cpf || '',
-                              data_nascimento: aluno.data_nascimento || '',
-                              endereco: aluno.endereco || '',
-                              cep: aluno.cep || '',
-                              data_inicio: aluno.data_inicio || '',
-                              status: aluno.status || 'ativo',
-                              tipo_plano: aluno.tipo_plano || 'padrao',
-                              plano_descricao: aluno.plano_descricao || '',
-                              plano_valor: aluno.plano_valor ? String(aluno.plano_valor) : '',
-                              professor_id: aluno.professor_id || '',
-                              menor_idade: Boolean(aluno.menor_idade),
-                              responsavel_nome: aluno.responsavel_nome || '',
-                              responsavel_telefone: aluno.responsavel_telefone || '',
-                              responsavel_email: aluno.responsavel_email || '',
-                              responsavel_cpf: aluno.responsavel_cpf || '',
-                              responsavel_endereco: aluno.responsavel_endereco || '',
-                              responsavel_cep: aluno.responsavel_cep || '',
-                            });
-                          }}
-                        >
-                          Editar
-                        </button>
-                        <button style={secondaryButtonStyle()} onClick={() => deleteRecord('alunos', aluno.id)}>Excluir</button>
-                      </div>
-                    </td>
-                  </tr>
+                {alunosPorProfessor.map((grupo) => (
+                  <>
+                    <tr key={`${grupo.professorId}-header`}>
+                      <td colSpan={7} style={{ ...tdStyle, background: COLORS.blueSoft, color: COLORS.blue, fontWeight: 900 }}>
+                        {grupo.professorNome} — {grupo.alunos.length} aluno(s)
+                      </td>
+                    </tr>
+                    {grupo.alunos.map((aluno) => (
+                      <tr key={aluno.id}>
+                        <td style={tdStyle}>
+                          <button
+                            style={{ border: 'none', background: 'transparent', color: COLORS.blue, fontWeight: 900, cursor: 'pointer', padding: 0 }}
+                            onClick={() => setSelectedAlunoId(aluno.id)}
+                          >
+                            {aluno.nome}
+                          </button>
+                        </td>
+                        <td style={tdStyle}>{aluno.telefone || '-'}</td>
+                        <td style={tdStyle}>{getProfessorName(professores, aluno.professor_id)}</td>
+                        <td style={tdStyle}>{aluno.tipo_plano === 'personalizado' ? 'Personalizado' : aluno.plano_descricao || '-'}</td>
+                        <td style={tdStyle}>{formatMoney(aluno.plano_valor)}</td>
+                        <td style={tdStyle}>{aluno.status || 'ativo'}</td>
+                        <td style={tdStyle}>
+                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                            <button style={secondaryButtonStyle()} onClick={() => setSelectedAlunoId(aluno.id)}>Ficha</button>
+                            <button
+                              style={secondaryButtonStyle()}
+                              onClick={() => {
+                                setEditingStudentId(aluno.id);
+                                setStudentForm({
+                                  nome: aluno.nome || '',
+                                  telefone: aluno.telefone || '',
+                                  email: aluno.email || '',
+                                  cpf: aluno.cpf || '',
+                                  data_nascimento: aluno.data_nascimento || '',
+                                  endereco: aluno.endereco || '',
+                                  cep: aluno.cep || '',
+                                  data_inicio: aluno.data_inicio || '',
+                                  status: aluno.status || 'ativo',
+                                  tipo_plano: aluno.tipo_plano || 'padrao',
+                                  plano_descricao: aluno.plano_descricao || '',
+                                  plano_valor: aluno.plano_valor ? String(aluno.plano_valor) : '',
+                                  professor_id: aluno.professor_id || '',
+                                  menor_idade: Boolean(aluno.menor_idade),
+                                  responsavel_nome: aluno.responsavel_nome || '',
+                                  responsavel_telefone: aluno.responsavel_telefone || '',
+                                  responsavel_email: aluno.responsavel_email || '',
+                                  responsavel_cpf: aluno.responsavel_cpf || '',
+                                  responsavel_endereco: aluno.responsavel_endereco || '',
+                                  responsavel_cep: aluno.responsavel_cep || '',
+                                });
+                              }}
+                            >
+                              Editar
+                            </button>
+                            <button style={secondaryButtonStyle()} onClick={() => deleteRecord('alunos', aluno.id)}>Excluir</button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </>
                 ))}
               </tbody>
             </table>
@@ -1287,12 +1431,17 @@ export default function Home() {
             <input style={inputStyle()} placeholder="E-mail" value={experimentalForm.email} onChange={(e) => setExperimentalForm({ ...experimentalForm, email: e.target.value })} />
             <input style={inputStyle()} type="date" value={experimentalForm.dia_contato} onChange={(e) => setExperimentalForm({ ...experimentalForm, dia_contato: e.target.value })} />
 
-            <select style={inputStyle()} value={experimentalForm.modalidade} onChange={(e) => setExperimentalForm({ ...experimentalForm, modalidade: e.target.value })}>
+            <select style={inputStyle()} value={experimentalForm.modalidade} onChange={(e) => setExperimentalForm({ ...experimentalForm, modalidade: e.target.value, categoria: '', professor_id: '', professor_preferencia: '' })}>
               <option value="Beach Tennis">Beach Tennis</option>
               <option value="Futevôlei">Futevôlei</option>
             </select>
 
-            <input style={inputStyle()} placeholder="Categoria" value={experimentalForm.categoria} onChange={(e) => setExperimentalForm({ ...experimentalForm, categoria: e.target.value })} />
+            <select style={inputStyle()} value={experimentalForm.categoria} onChange={(e) => setExperimentalForm({ ...experimentalForm, categoria: e.target.value })}>
+              <option value="">Categoria</option>
+              {categoryOptions(experimentalForm.modalidade).map((categoria) => (
+                <option key={categoria} value={categoria}>{categoria}</option>
+              ))}
+            </select>
 
             <select
               style={inputStyle()}
@@ -1307,7 +1456,7 @@ export default function Home() {
               }}
             >
               <option value="">Professor de preferência</option>
-              {professores.map((prof) => (
+              {professoresPorModalidade(experimentalForm.modalidade).map((prof) => (
                 <option key={prof.id} value={prof.id}>{prof.nome}</option>
               ))}
             </select>
@@ -1414,7 +1563,7 @@ export default function Home() {
                               categoria: item.categoria || '',
                               professor_id: item.professor_id || '',
                               professor_preferencia: item.professor_preferencia || '',
-                              dia_contato: item.dia_contato || new Date().toISOString().slice(0, 10),
+                              dia_contato: item.dia_contato || dateBR(),
                               dia_preferido: item.dia_preferido || '',
                               periodo_preferido: item.periodo_preferido || '',
                               horario_pode_fazer: item.horario_pode_fazer || '',
@@ -1460,16 +1609,21 @@ export default function Home() {
           <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, 1fr)' }}>
             <input style={inputStyle()} placeholder="Nome da turma" value={turmaForm.nome} onChange={(e) => setTurmaForm({ ...turmaForm, nome: e.target.value })} />
 
-            <select style={inputStyle()} value={turmaForm.modalidade} onChange={(e) => setTurmaForm({ ...turmaForm, modalidade: e.target.value })}>
+            <select style={inputStyle()} value={turmaForm.modalidade} onChange={(e) => setTurmaForm({ ...turmaForm, modalidade: e.target.value, categoria: '', professor_id: '' })}>
               <option value="Beach Tennis">Beach Tennis</option>
               <option value="Futevôlei">Futevôlei</option>
             </select>
 
-            <input style={inputStyle()} placeholder="Categoria" value={turmaForm.categoria} onChange={(e) => setTurmaForm({ ...turmaForm, categoria: e.target.value })} />
+            <select style={inputStyle()} value={turmaForm.categoria} onChange={(e) => setTurmaForm({ ...turmaForm, categoria: e.target.value })}>
+              <option value="">Categoria</option>
+              {categoryOptions(turmaForm.modalidade).map((categoria) => (
+                <option key={categoria} value={categoria}>{categoria}</option>
+              ))}
+            </select>
 
             <select style={inputStyle()} value={turmaForm.professor_id} onChange={(e) => setTurmaForm({ ...turmaForm, professor_id: e.target.value })}>
               <option value="">Professor</option>
-              {professores.map((prof) => (
+              {professoresPorModalidade(turmaForm.modalidade).map((prof) => (
                 <option key={prof.id} value={prof.id}>{prof.nome}</option>
               ))}
             </select>
@@ -1485,8 +1639,18 @@ export default function Home() {
               <option value="domingo">Domingo</option>
             </select>
 
-            <input style={inputStyle()} placeholder="Horário" value={turmaForm.horario} onChange={(e) => setTurmaForm({ ...turmaForm, horario: e.target.value })} />
-            <input style={inputStyle()} placeholder="Quadra" value={turmaForm.quadra} onChange={(e) => setTurmaForm({ ...turmaForm, quadra: e.target.value })} />
+            <select style={inputStyle()} value={turmaForm.horario} onChange={(e) => setTurmaForm({ ...turmaForm, horario: e.target.value })}>
+              <option value="">Horário</option>
+              {CLASS_TIMES.map((horario) => (
+                <option key={horario} value={horario}>{horario}</option>
+              ))}
+            </select>
+            <select style={inputStyle()} value={turmaForm.quadra} onChange={(e) => setTurmaForm({ ...turmaForm, quadra: e.target.value })}>
+              <option value="">Quadra</option>
+              {COURTS.map((quadra) => (
+                <option key={quadra} value={quadra}>{quadra}</option>
+              ))}
+            </select>
             <input style={inputStyle()} placeholder="Capacidade" type="number" value={turmaForm.capacidade} onChange={(e) => setTurmaForm({ ...turmaForm, capacidade: e.target.value })} />
           </div>
 
@@ -1681,7 +1845,20 @@ export default function Home() {
           <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Lançamento financeiro</h2>
 
           <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, 1fr)' }}>
-            <select style={inputStyle()} value={financialForm.aluno_id} onChange={(e) => setFinancialForm({ ...financialForm, aluno_id: e.target.value })}>
+            <select
+              style={inputStyle()}
+              value={financialForm.aluno_id}
+              onChange={(e) => {
+                const aluno = alunos.find((item) => item.id === e.target.value);
+                setFinancialForm({
+                  ...financialForm,
+                  aluno_id: e.target.value,
+                  professor_id: aluno?.professor_id || '',
+                  valor: aluno?.plano_valor ? String(aluno.plano_valor) : '',
+                  observacao: aluno ? `Plano: ${aluno.plano_descricao || 'não informado'} • Status: ${aluno.status || 'ativo'}` : financialForm.observacao,
+                });
+              }}
+            >
               <option value="">Aluno</option>
               {alunos.map((aluno) => (
                 <option key={aluno.id} value={aluno.id}>{aluno.nome}</option>
@@ -1690,7 +1867,7 @@ export default function Home() {
 
             <select style={inputStyle()} value={financialForm.professor_id} onChange={(e) => setFinancialForm({ ...financialForm, professor_id: e.target.value })}>
               <option value="">Professor</option>
-              {professores.map((prof) => (
+              {professoresAtivos.map((prof) => (
                 <option key={prof.id} value={prof.id}>{prof.nome}</option>
               ))}
             </select>
@@ -1780,13 +1957,18 @@ export default function Home() {
 
               <tbody>
                 {financeiro.map((item) => (
-                  <tr key={item.id}>
+                  <tr
+                    key={item.id}
+                    style={{
+                      background: item.recebido ? '#f0fff4' : item.status === 'atrasado' ? '#fff5f5' : '#fffdf0',
+                    }}
+                  >
                     <td style={tdStyle}>{item.mes || '-'}</td>
                     <td style={tdStyle}>{getAlunoName(alunos, item.aluno_id)}</td>
                     <td style={tdStyle}>{getProfessorName(professores, item.professor_id)}</td>
                     <td style={tdStyle}>{formatMoney(item.valor)}</td>
                     <td style={tdStyle}>{item.vencimento || '-'}</td>
-                    <td style={tdStyle}>{item.recebido ? 'Recebido' : item.status || 'Pendente'}</td>
+                    <td style={{ ...tdStyle, color: item.recebido ? '#1f7a3a' : item.status === 'atrasado' ? COLORS.danger : COLORS.warning, fontWeight: 900 }}>{item.recebido ? 'Recebido' : item.status || 'Pendente'}</td>
                     <td style={tdStyle}>{item.forma_pagamento || '-'}</td>
                     <td style={tdStyle}>
                       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
@@ -1798,8 +1980,8 @@ export default function Home() {
                               aluno_id: item.aluno_id || '',
                               professor_id: item.professor_id || '',
                               valor: item.valor ? String(item.valor) : '',
-                              vencimento: item.vencimento || new Date().toISOString().slice(0, 10),
-                              mes: item.mes || new Date().toISOString().slice(0, 7),
+                              vencimento: item.vencimento || dateBR(),
+                              mes: item.mes || monthBR(),
                               recebido: Boolean(item.recebido),
                               forma_pagamento: item.forma_pagamento || '',
                               status: item.status || 'pendente',
@@ -1825,6 +2007,21 @@ export default function Home() {
     );
   }
 
+  function getTodayPresence(alunoId: string, turmaId: string) {
+    return presencas.find((item) => item.aluno_id === alunoId && item.turma_id === turmaId && item.data_aula === dateBR());
+  }
+
+  function presenceButtonStyle(active: boolean, variant: 'presente' | 'falta' | 'especial') {
+    if (!active) return secondaryButtonStyle();
+
+    return {
+      ...primaryButtonStyle(),
+      background: variant === 'falta' ? COLORS.danger : variant === 'especial' ? COLORS.green : COLORS.blue,
+      color: variant === 'especial' ? COLORS.blueDark : '#fff',
+      boxShadow: '0 8px 20px rgba(63, 64, 151, 0.16)',
+    };
+  }
+
   function renderTeacherToday() {
     const todayTurmas = teacherTurmas;
 
@@ -1847,7 +2044,12 @@ export default function Home() {
               </p>
 
               <div style={{ display: 'grid', gap: 12 }}>
-                {alunosDaTurma.map((aluno) => (
+                {alunosDaTurma.map((aluno) => {
+                  const presencaHoje = getTodayPresence(aluno.id, turma.id);
+                  const tipoAtual = presencaHoje?.tipo_presenca || '';
+                  const presenteAtual = Boolean(presencaHoje?.presente);
+
+                  return (
                   <div
                     key={aluno.id}
                     style={{
@@ -1869,28 +2071,29 @@ export default function Home() {
                     </div>
 
                     <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                      <button style={primaryButtonStyle()} onClick={() => registerPresence(aluno.id, turma.id, true, 'normal')}>
+                      <button style={presenceButtonStyle(presenteAtual && tipoAtual === 'normal', 'presente')} onClick={() => registerPresence(aluno.id, turma.id, true, 'normal')}>
                         Presente
                       </button>
 
-                      <button style={secondaryButtonStyle()} onClick={() => registerPresence(aluno.id, turma.id, false, 'falta')}>
+                      <button style={presenceButtonStyle(Boolean(presencaHoje) && !presenteAtual, 'falta')} onClick={() => registerPresence(aluno.id, turma.id, false, 'falta')}>
                         Falta
                       </button>
 
-                      <button style={secondaryButtonStyle()} onClick={() => registerPresence(aluno.id, turma.id, true, 'experimental')}>
+                      <button style={presenceButtonStyle(tipoAtual === 'experimental', 'especial')} onClick={() => registerPresence(aluno.id, turma.id, true, 'experimental')}>
                         Experimental
                       </button>
 
-                      <button style={secondaryButtonStyle()} onClick={() => registerPresence(aluno.id, turma.id, true, 'avulsa')}>
+                      <button style={presenceButtonStyle(tipoAtual === 'avulsa', 'especial')} onClick={() => registerPresence(aluno.id, turma.id, true, 'avulsa')}>
                         Avulsa
                       </button>
 
-                      <button style={secondaryButtonStyle()} onClick={() => registerPresence(aluno.id, turma.id, true, 'reposicao')}>
+                      <button style={presenceButtonStyle(tipoAtual === 'reposicao', 'especial')} onClick={() => registerPresence(aluno.id, turma.id, true, 'reposicao')}>
                         Reposição
                       </button>
                     </div>
                   </div>
-                ))}
+                  );
+                })}
 
                 {alunosDaTurma.length === 0 && (
                   <p style={{ color: COLORS.muted }}>Nenhum aluno vinculado a esta turma.</p>
@@ -2007,6 +2210,72 @@ export default function Home() {
           </div>
         </div>
       </section>
+    );
+  }
+
+  function renderStudentDetailsModal() {
+    const aluno = alunos.find((item) => item.id === selectedAlunoId);
+    if (!aluno) return null;
+
+    const alunoFinanceiro = financeiro.filter((item) => item.aluno_id === aluno.id);
+    const alunoMatriculas = matriculas.filter((item) => item.aluno_id === aluno.id);
+    const alunoPresencas = presencas.filter((item) => item.aluno_id === aluno.id);
+
+    return (
+      <div style={{ position: 'fixed', inset: 0, background: 'rgba(8, 12, 38, 0.45)', display: 'grid', placeItems: 'center', zIndex: 1000, padding: 20 }}>
+        <div style={{ ...cardStyle, width: 'min(900px, 96vw)', maxHeight: '88vh', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' }}>
+            <div>
+              <h2 style={{ color: COLORS.blue, marginTop: 0 }}>{aluno.nome}</h2>
+              <p style={{ color: COLORS.muted, marginTop: -8 }}>Ficha completa do aluno</p>
+            </div>
+            <button style={secondaryButtonStyle()} onClick={() => setSelectedAlunoId(null)}>Fechar</button>
+          </div>
+
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+            <p><strong>Telefone:</strong><br />{aluno.telefone || '-'}</p>
+            <p><strong>E-mail:</strong><br />{aluno.email || '-'}</p>
+            <p><strong>CPF:</strong><br />{aluno.cpf || '-'}</p>
+            <p><strong>Data de nascimento:</strong><br />{aluno.data_nascimento || '-'}</p>
+            <p><strong>Data de início no CT:</strong><br />{aluno.data_inicio || '-'}</p>
+            <p><strong>Professor:</strong><br />{getProfessorName(professores, aluno.professor_id)}</p>
+            <p><strong>Plano:</strong><br />{aluno.plano_descricao || '-'}</p>
+            <p><strong>Valor:</strong><br />{formatMoney(aluno.plano_valor)}</p>
+            <p><strong>Status:</strong><br />{aluno.status || 'ativo'}</p>
+            <p><strong>Endereço:</strong><br />{aluno.endereco || '-'}</p>
+            <p><strong>CEP:</strong><br />{aluno.cep || '-'}</p>
+          </div>
+
+          {aluno.menor_idade ? (
+            <div style={{ marginTop: 16, padding: 16, borderRadius: 16, background: COLORS.blueSoft }}>
+              <h3 style={{ color: COLORS.blue, marginTop: 0 }}>Responsável</h3>
+              <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                <p><strong>Nome:</strong><br />{aluno.responsavel_nome || '-'}</p>
+                <p><strong>Telefone:</strong><br />{aluno.responsavel_telefone || '-'}</p>
+                <p><strong>E-mail:</strong><br />{aluno.responsavel_email || '-'}</p>
+                <p><strong>CPF:</strong><br />{aluno.responsavel_cpf || '-'}</p>
+                <p><strong>Endereço:</strong><br />{aluno.responsavel_endereco || '-'}</p>
+                <p><strong>CEP:</strong><br />{aluno.responsavel_cep || '-'}</p>
+              </div>
+            </div>
+          ) : null}
+
+          <div style={{ marginTop: 16, display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+            <div style={{ padding: 16, borderRadius: 16, border: `1px solid ${COLORS.border}` }}>
+              <strong>Turmas/Matrículas</strong>
+              <p style={{ color: COLORS.muted }}>{alunoMatriculas.map((item) => getTurmaName(turmas, item.turma_id)).join(' • ') || 'Nenhuma matrícula vinculada.'}</p>
+            </div>
+            <div style={{ padding: 16, borderRadius: 16, border: `1px solid ${COLORS.border}` }}>
+              <strong>Financeiro</strong>
+              <p style={{ color: COLORS.muted }}>{alunoFinanceiro.length} lançamento(s) • Recebido: {formatMoney(alunoFinanceiro.filter((item) => item.recebido).reduce((sum, item) => sum + Number(item.valor || 0), 0))}</p>
+            </div>
+            <div style={{ padding: 16, borderRadius: 16, border: `1px solid ${COLORS.border}` }}>
+              <strong>Presenças</strong>
+              <p style={{ color: COLORS.muted }}>{alunoPresencas.length} registro(s)</p>
+            </div>
+          </div>
+        </div>
+      </div>
     );
   }
 
