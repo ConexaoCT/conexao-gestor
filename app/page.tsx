@@ -6,7 +6,7 @@ import { supabase } from '../lib/supabase';
 type Screen = 'login' | 'admin' | 'reception' | 'teacher';
 type LoginTab = 'admin' | 'reception' | 'teacher';
 type AdminTab = 'dashboard' | 'students' | 'experimentals' | 'classes' | 'enrollments' | 'attendance' | 'financial';
-type ReceptionTab = 'students' | 'experimentals' | 'classes' | 'enrollments';
+type ReceptionTab = 'students' | 'experimentals' | 'classes' | 'enrollments' | 'attendance';
 type TeacherTab = 'today' | 'students' | 'financial';
 
 type Professor = {
@@ -1005,6 +1005,7 @@ export default function Home() {
           <button style={activeButtonStyle(receptionTab === 'students')} onClick={() => setReceptionTab('students')}>Alunos</button>
           <button style={activeButtonStyle(receptionTab === 'classes')} onClick={() => setReceptionTab('classes')}>Turmas</button>
           <button style={activeButtonStyle(receptionTab === 'enrollments')} onClick={() => setReceptionTab('enrollments')}>Matrículas</button>
+          <button style={activeButtonStyle(receptionTab === 'attendance')} onClick={() => setReceptionTab('attendance')}>Presenças</button>
         </div>
       );
     }
@@ -2001,6 +2002,7 @@ export default function Home() {
       if (receptionTab === 'experimentals') return renderExperimentals();
       if (receptionTab === 'classes') return renderClasses();
       if (receptionTab === 'enrollments') return renderEnrollments();
+      if (receptionTab === 'attendance') return renderAttendance();
     }
 
     if (screen === 'teacher') {
