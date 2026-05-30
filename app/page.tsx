@@ -1,6 +1,6 @@
 'use client';
 
-/* V1 OPERACIONAL FINAL - Gestor Conexão */
+/* V2 GESTOR COMPLETO - Dashboard Executivo, Retenção e Relatórios */
 
 import { useEffect, useMemo, useState } from 'react';
 import { supabase } from '../lib/supabase';
@@ -43,6 +43,12 @@ type Aluno = {
   responsavel_cpf: string | null;
   responsavel_endereco: string | null;
   responsavel_cep: string | null;
+  created_at?: string | null;
+  data_saida?: string | null;
+  origem_matricula?: string | null;
+  contrato_status?: string | null;
+  contrato_url?: string | null;
+  data_contrato?: string | null;
 };
 
 type Experimental = {
@@ -353,6 +359,28 @@ function formatMoney(value?: number | null) {
   return safeValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 }
 
+function professorRate(percentual?: number | null) {
+  const value = Number(percentual || 0);
+  if (!Number.isFinite(value)) return 0;
+  return value <= 1 ? value : value / 100;
+}
+
+function formatPercent(value: number) {
+  if (!Number.isFinite(value)) return '0%';
+  return `${value.toFixed(1).replace('.', ',')}%`;
+}
+
+function sameMonth(dateValue?: string | null, monthValue = monthBR()) {
+  if (!dateValue) return false;
+  return dateValue.slice(0, 7) === monthValue;
+}
+
+function monthLabel(monthValue = monthBR()) {
+  const [year, month] = monthValue.split('-');
+  if (!year || !month) return monthValue;
+  return `${month}/${year}`;
+}
+
 function getProfessorName(professores: Professor[], id?: string | null) {
   return professores.find((prof) => prof.id === id)?.nome || '-';
 }
@@ -528,6 +556,75 @@ export default function Home() {
 
     return grupos.filter((grupo) => grupo.alunos.length > 0);
   }, [alunos, professoresAtivos]);
+
+
+  const dashboardMetrics = useMemo(() => {
+    const currentMonth = monthBR();
+    const alunosAtivos = alunos.filter((aluno) => aluno.status !== 'inativo');
+    const alunosInativos = alunos.filter((aluno) => aluno.status === 'inativo');
+    const entradasMes = alunos.filter((aluno) => sameMonth(aluno.created_at || aluno.data_inicio, currentMonth));
+    const saidasMes = alunos.filter((aluno) => sameMonth(aluno.data_saida, currentMonth) || (aluno.status === 'inativo' && sameMonth(aluno.created_at, currentMonth)));
+    const baseInicioMes = Math.max(alunosAtivos.length + saidasMes.length - entradasMes.length, 0);
+    const retencao = baseInicioMes > 0 ? ((baseInicioMes - saidasMes.length) / baseInicioMes) * 100 : 100;
+    const evasao = baseInicioMes > 0 ? (saidasMes.length / baseInicioMes) * 100 : 0;
+
+    const recebidosMes = financeiro.filter((item) => item.recebido && sameMonth(item.mes || item.vencimento, currentMonth));
+    const pendentesMes = financeiro.filter((item) => !item.recebido && sameMonth(item.mes || item.vencimento, currentMonth));
+    const previstosMes = financeiro.filter((item) => sameMonth(item.mes || item.vencimento, currentMonth));
+
+    const receitaRecebida = recebidosMes.reduce((sum, item) => sum + Number(item.valor || 0), 0);
+    const receitaPendente = pendentesMes.reduce((sum, item) => sum + Number(item.valor || 0), 0);
+    const receitaPrevista = previstosMes.reduce((sum, item) => sum + Number(item.valor || 0), 0);
+    const inadimplentes = alunosAtivos.filter((aluno) => aluno.status === 'inadimplente').length;
+
+    const experimentaisMes = experimentais.filter((item) => sameMonth(item.created_at || item.dia_contato, currentMonth));
+    const fizeramExperimental = experimentaisMes.filter((item) => item.fez_aula_experimental).length;
+    const fecharamExperimental = experimentaisMes.filter((item) => item.fechou_plano).length;
+    const conversaoExperimental = fizeramExperimental > 0 ? (fecharamExperimental / fizeramExperimental) * 100 : 0;
+
+    const porModalidade = {
+      beach: alunosAtivos.filter((aluno) => modalityFromPlan(aluno.plano_descricao) === 'Beach Tennis').length,
+      fute: alunosAtivos.filter((aluno) => modalityFromPlan(aluno.plano_descricao) === 'Futevôlei').length,
+    };
+
+    const porProfessor = professoresAtivos.map((professor) => {
+      const alunosProfessor = alunosAtivos.filter((aluno) => aluno.professor_id === professor.id);
+      const financeirosProfessor = previstosMes.filter((item) => item.professor_id === professor.id);
+      const recebido = financeirosProfessor.filter((item) => item.recebido).reduce((sum, item) => sum + Number(item.valor || 0), 0);
+      const pendente = financeirosProfessor.filter((item) => !item.recebido).reduce((sum, item) => sum + Number(item.valor || 0), 0);
+      const rate = professorRate(professor.percentual);
+      return {
+        professor,
+        alunos: alunosProfessor.length,
+        recebido,
+        pendente,
+        comissao: recebido * rate,
+        arena: recebido * (1 - rate),
+        conversoes: experimentaisMes.filter((item) => item.professor_id === professor.id && item.fechou_plano).length,
+      };
+    });
+
+    return {
+      currentMonth,
+      alunosAtivos: alunosAtivos.length,
+      alunosInativos: alunosInativos.length,
+      entradasMes: entradasMes.length,
+      saidasMes: saidasMes.length,
+      saldoMes: entradasMes.length - saidasMes.length,
+      retencao,
+      evasao,
+      receitaPrevista,
+      receitaRecebida,
+      receitaPendente,
+      inadimplentes,
+      experimentaisMes: experimentaisMes.length,
+      fizeramExperimental,
+      fecharamExperimental,
+      conversaoExperimental,
+      porModalidade,
+      porProfessor,
+    };
+  }, [alunos, financeiro, experimentais, professoresAtivos]);
 
   function logout() {
     setScreen('login');
@@ -1159,18 +1256,16 @@ export default function Home() {
 
     const totalArena = financeiro.reduce((acc, item) => {
       const professor = professores.find((prof) => prof.id === item.professor_id);
-      const percentualProfessor = professor?.percentual || 0;
+      const percentualProfessor = professorRate(professor?.percentual);
       const valor = Number(item.valor || 0);
-
-      return acc + (valor - (valor * percentualProfessor) / 100);
+      return acc + valor * (1 - percentualProfessor);
     }, 0);
 
     const totalProfessores = financeiro.reduce((acc, item) => {
       const professor = professores.find((prof) => prof.id === item.professor_id);
-      const percentualProfessor = professor?.percentual || 0;
+      const percentualProfessor = professorRate(professor?.percentual);
       const valor = Number(item.valor || 0);
-
-      return acc + (valor * percentualProfessor) / 100;
+      return acc + valor * percentualProfessor;
     }, 0);
 
     return {
@@ -1182,25 +1277,66 @@ export default function Home() {
   }, [financeiro, professores]);
 
 
+  function renderMetricCard(label: string, value: string | number, detail?: string) {
+    return (
+      <div style={cardStyle}>
+        <strong style={{ color: COLORS.muted }}>{label}</strong>
+        <h2 style={{ color: COLORS.blue, fontSize: 30, margin: '8px 0' }}>{value}</h2>
+        {detail ? <p style={{ color: COLORS.muted, margin: 0, fontSize: 13 }}>{detail}</p> : null}
+      </div>
+    );
+  }
+
   function renderDashboard() {
     return (
-      <section style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(4, 1fr)' }}>
-        <div style={cardStyle}>
-          <strong style={{ color: COLORS.muted }}>Alunos ativos</strong>
-          <h2 style={{ color: COLORS.blue, fontSize: 34 }}>{activeAlunos.length}</h2>
+      <section style={{ display: 'grid', gap: 18 }}>
+        <div style={{ ...cardStyle, background: `linear-gradient(135deg, ${COLORS.blue}, ${COLORS.blueDark})`, color: '#fff' }}>
+          <p style={{ margin: 0, opacity: 0.85, fontWeight: 800 }}>Dashboard executivo · {monthLabel(dashboardMetrics.currentMonth)}</p>
+          <h2 style={{ margin: '8px 0 0', fontSize: 34 }}>Visão geral da operação Conexão CT</h2>
+          <p style={{ marginBottom: 0, opacity: 0.9 }}>Alunos, financeiro, retenção, conversão de experimentais e desempenho por professor.</p>
         </div>
-        <div style={cardStyle}>
-          <strong style={{ color: COLORS.muted }}>Experimentais</strong>
-          <h2 style={{ color: COLORS.blue, fontSize: 34 }}>{experimentais.length}</h2>
+
+        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          {renderMetricCard('Alunos ativos', dashboardMetrics.alunosAtivos, `Beach: ${dashboardMetrics.porModalidade.beach} • Futevôlei: ${dashboardMetrics.porModalidade.fute}`)}
+          {renderMetricCard('Receita prevista', formatMoney(dashboardMetrics.receitaPrevista), `Recebido: ${formatMoney(dashboardMetrics.receitaRecebida)}`)}
+          {renderMetricCard('Receita pendente', formatMoney(dashboardMetrics.receitaPendente), `${dashboardMetrics.inadimplentes} aluno(s) inadimplente(s)`)}
+          {renderMetricCard('Turmas ativas', activeTurmas.length, `${matriculas.filter((item) => item.ativa !== false).length} matrícula(s) vinculada(s)`)}
         </div>
-        <div style={cardStyle}>
-          <strong style={{ color: COLORS.muted }}>Turmas ativas</strong>
-          <h2 style={{ color: COLORS.blue, fontSize: 34 }}>{activeTurmas.length}</h2>
+
+        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+          {renderMetricCard('Entraram no mês', dashboardMetrics.entradasMes, `Saldo: ${dashboardMetrics.saldoMes >= 0 ? '+' : ''}${dashboardMetrics.saldoMes}`)}
+          {renderMetricCard('Saíram no mês', dashboardMetrics.saidasMes, `Evasão: ${formatPercent(dashboardMetrics.evasao)}`)}
+          {renderMetricCard('Retenção', formatPercent(dashboardMetrics.retencao), 'Base estimada do mês atual')}
+          {renderMetricCard('Conversão experimental', formatPercent(dashboardMetrics.conversaoExperimental), `${dashboardMetrics.fecharamExperimental}/${dashboardMetrics.fizeramExperimental} fecharam após fazer aula`)}
         </div>
-        <div style={cardStyle}>
-          <strong style={{ color: COLORS.muted }}>Recebido</strong>
-          <h2 style={{ color: COLORS.blue, fontSize: 26 }}>{formatMoney(totalRecebido)}</h2>
-          <p style={{ color: COLORS.muted, margin: 0 }}>Total lançado: {formatMoney(totalReceber)}</p>
+
+        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+          <div style={cardStyle}>
+            <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Professores</h2>
+            <div style={{ display: 'grid', gap: 10 }}>
+              {dashboardMetrics.porProfessor.map((item) => (
+                <div key={item.professor.id} style={{ border: `1px solid ${COLORS.border}`, borderRadius: 16, padding: 14 }}>
+                  <strong style={{ color: COLORS.blue }}>{item.professor.nome}</strong>
+                  <div style={{ color: COLORS.muted, marginTop: 6 }}>
+                    {item.alunos} aluno(s) • recebido {formatMoney(item.recebido)} • pendente {formatMoney(item.pendente)}
+                  </div>
+                  <div style={{ color: COLORS.muted, marginTop: 4 }}>
+                    Comissão: {formatMoney(item.comissao)} • Arena: {formatMoney(item.arena)} • Conversões: {item.conversoes}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div style={cardStyle}>
+            <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Experimentais do mês</h2>
+            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(2, 1fr)' }}>
+              {renderMetricCard('Cadastrados', dashboardMetrics.experimentaisMes)}
+              {renderMetricCard('Fizeram aula', dashboardMetrics.fizeramExperimental)}
+              {renderMetricCard('Fecharam plano', dashboardMetrics.fecharamExperimental)}
+              {renderMetricCard('Conversão', formatPercent(dashboardMetrics.conversaoExperimental))}
+            </div>
+          </div>
         </div>
       </section>
     );
@@ -2157,7 +2293,7 @@ export default function Home() {
 
   function renderTeacherFinancial() {
     const rows = financeiro.filter((item) => item.professor_id === currentProfessor?.id);
-    const percentual = Number(currentProfessor?.percentual || 0);
+    const percentual = professorRate(currentProfessor?.percentual);
     const totalProfessor = rows
       .filter((item) => item.recebido)
       .reduce((sum, item) => sum + Number(item.valor || 0) * percentual, 0);
@@ -2168,7 +2304,7 @@ export default function Home() {
           <strong style={{ color: COLORS.muted }}>Total do professor no mês/lançamentos recebidos</strong>
           <h2 style={{ color: COLORS.blue, fontSize: 34 }}>{formatMoney(totalProfessor)}</h2>
           <p style={{ color: COLORS.muted, margin: 0 }}>
-            Percentual cadastrado: {(percentual * 100).toFixed(0)}%
+            Percentual cadastrado: {formatPercent(percentual * 100)}
           </p>
         </div>
 
@@ -2242,6 +2378,8 @@ export default function Home() {
             <p><strong>Plano:</strong><br />{aluno.plano_descricao || '-'}</p>
             <p><strong>Valor:</strong><br />{formatMoney(aluno.plano_valor)}</p>
             <p><strong>Status:</strong><br />{aluno.status || 'ativo'}</p>
+            <p><strong>Origem matrícula:</strong><br />{aluno.origem_matricula || 'manual'}</p>
+            <p><strong>Contrato:</strong><br />{aluno.contrato_status || 'pendente'}</p>
             <p><strong>Endereço:</strong><br />{aluno.endereco || '-'}</p>
             <p><strong>CEP:</strong><br />{aluno.cep || '-'}</p>
           </div>
