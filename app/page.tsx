@@ -1705,7 +1705,6 @@ export default function Home() {
             {experimentais.length === 0 ? <p style={{ color: COLORS.muted }}>Nenhum experimental cadastrado.</p> : null}
           </div>
         </div>
-        </div>
       </section>
     );
   }
