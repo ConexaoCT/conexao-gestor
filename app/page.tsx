@@ -53,6 +53,7 @@ type Aluno = {
 
 type Experimental = {
   id: string;
+  created_at?: string | null;
   nome: string;
   telefone: string | null;
   email: string | null;
