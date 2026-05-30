@@ -72,7 +72,6 @@ type Experimental = {
   status_lead: string | null;
   follow_up: string | null;
   observacoes: string | null;
-  created_at?: string;
 };
 
 type Turma = {
@@ -1344,22 +1343,111 @@ export default function Home() {
   }
 
   function renderStudents() {
+    const alunosAtivosLocal = alunos.filter((aluno) => aluno.status !== 'inativo');
+
+    const getPlanKind = (aluno: Aluno) => {
+      const plano = normalizeText(`${aluno.tipo_plano || ''} ${aluno.plano_descricao || ''}`);
+      if (plano.includes('personalizado')) return 'personalizado';
+      if (plano.includes('2x')) return '2x';
+      if (plano.includes('1x')) return '1x';
+      if (Number(aluno.plano_valor || 0) === 320 || Number(aluno.plano_valor || 0) === 215) return '2x';
+      if (Number(aluno.plano_valor || 0) === 220 || Number(aluno.plano_valor || 0) === 125) return '1x';
+      return 'sem-plano';
+    };
+
+    const countPlan = (lista: Aluno[], tipo: '1x' | '2x' | 'personalizado' | 'sem-plano') =>
+      lista.filter((aluno) => getPlanKind(aluno) === tipo).length;
+
+    const metricCard = (label: string, value: string | number, helper?: string) => (
+      <div
+        style={{
+          ...cardStyle,
+          padding: 18,
+          minHeight: 118,
+          display: 'flex',
+          flexDirection: 'column',
+          justifyContent: 'space-between',
+        }}
+      >
+        <strong style={{ color: COLORS.muted, fontSize: 13 }}>{label}</strong>
+        <div style={{ color: COLORS.blue, fontSize: 34, fontWeight: 900, lineHeight: 1 }}>{value}</div>
+        {helper ? <span style={{ color: COLORS.muted, fontSize: 12 }}>{helper}</span> : <span />}
+      </div>
+    );
+
+    const renderAlunoActions = (aluno: Aluno) => (
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+        <button style={secondaryButtonStyle()} onClick={() => setSelectedAlunoId(aluno.id)}>
+          Ficha
+        </button>
+        <button
+          style={secondaryButtonStyle()}
+          onClick={() => {
+            setEditingStudentId(aluno.id);
+            setStudentForm({
+              nome: aluno.nome || '',
+              telefone: aluno.telefone || '',
+              email: aluno.email || '',
+              cpf: aluno.cpf || '',
+              data_nascimento: aluno.data_nascimento || '',
+              endereco: aluno.endereco || '',
+              cep: aluno.cep || '',
+              data_inicio: aluno.data_inicio || '',
+              status: aluno.status || 'ativo',
+              tipo_plano: aluno.tipo_plano || 'padrao',
+              plano_descricao: aluno.plano_descricao || '',
+              plano_valor: aluno.plano_valor ? String(aluno.plano_valor) : '',
+              professor_id: aluno.professor_id || '',
+              menor_idade: Boolean(aluno.menor_idade),
+              responsavel_nome: aluno.responsavel_nome || '',
+              responsavel_telefone: aluno.responsavel_telefone || '',
+              responsavel_email: aluno.responsavel_email || '',
+              responsavel_cpf: aluno.responsavel_cpf || '',
+              responsavel_endereco: aluno.responsavel_endereco || '',
+              responsavel_cep: aluno.responsavel_cep || '',
+            });
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+          }}
+        >
+          Editar
+        </button>
+        <button style={secondaryButtonStyle()} onClick={() => deleteRecord('alunos', aluno.id)}>
+          Excluir
+        </button>
+      </div>
+    );
+
     return (
       <section style={{ display: 'grid', gap: 20 }}>
-        <div style={cardStyle}>
-          <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Cadastro de alunos</h2>
+        <div style={{ ...cardStyle, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
+            <div>
+              <h2 style={{ color: COLORS.blue, margin: 0 }}>Cadastro de alunos</h2>
+              <p style={{ color: COLORS.muted, margin: '6px 0 0' }}>
+                Cadastre alunos matriculados, defina professor, plano e dados do responsável quando for menor.
+              </p>
+            </div>
+            {editingStudentId ? (
+              <div style={{ padding: '8px 12px', borderRadius: 999, background: COLORS.blueSoft, color: COLORS.blue, fontWeight: 900 }}>
+                Editando aluno
+              </div>
+            ) : null}
+          </div>
 
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', alignItems: 'end' }}>
             <input style={inputStyle()} placeholder="Nome completo" value={studentForm.nome} onChange={(e) => setStudentForm({ ...studentForm, nome: e.target.value })} />
             <input style={inputStyle()} placeholder="Celular" value={studentForm.telefone} onChange={(e) => setStudentForm({ ...studentForm, telefone: maskPhone(e.target.value) })} />
             <input style={inputStyle()} placeholder="E-mail" value={studentForm.email} onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })} />
             <input style={inputStyle()} placeholder="CPF" value={studentForm.cpf} onChange={(e) => setStudentForm({ ...studentForm, cpf: maskCPF(e.target.value) })} />
+
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: COLORS.muted, marginBottom: 6 }}>Data de nascimento</label>
               <input style={{ ...inputStyle(), width: '100%' }} type="date" value={studentForm.data_nascimento} onChange={(e) => setStudentForm({ ...studentForm, data_nascimento: e.target.value })} />
             </div>
+
             <input style={inputStyle()} placeholder="Endereço" value={studentForm.endereco} onChange={(e) => setStudentForm({ ...studentForm, endereco: e.target.value })} />
             <input style={inputStyle()} placeholder="CEP" value={studentForm.cep} onChange={(e) => setStudentForm({ ...studentForm, cep: maskCEP(e.target.value) })} />
+
             <div>
               <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: COLORS.muted, marginBottom: 6 }}>Data de início no CT</label>
               <input style={{ ...inputStyle(), width: '100%' }} type="date" value={studentForm.data_inicio} onChange={(e) => setStudentForm({ ...studentForm, data_inicio: e.target.value })} />
@@ -1423,7 +1511,7 @@ export default function Home() {
           </label>
 
           {studentForm.menor_idade && (
-            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(3, 1fr)', marginTop: 12 }}>
+            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', marginTop: 12, padding: 16, borderRadius: 18, background: COLORS.blueSoft }}>
               <input style={inputStyle()} placeholder="Nome do responsável" value={studentForm.responsavel_nome} onChange={(e) => setStudentForm({ ...studentForm, responsavel_nome: e.target.value })} />
               <input style={inputStyle()} placeholder="Celular do responsável" value={studentForm.responsavel_telefone} onChange={(e) => setStudentForm({ ...studentForm, responsavel_telefone: maskPhone(e.target.value) })} />
               <input style={inputStyle()} placeholder="E-mail do responsável" value={studentForm.responsavel_email} onChange={(e) => setStudentForm({ ...studentForm, responsavel_email: e.target.value })} />
@@ -1452,104 +1540,111 @@ export default function Home() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-          <div style={cardStyle}>
-            <strong style={{ color: COLORS.muted }}>Total de alunos</strong>
-            <h2 style={{ color: COLORS.blue, fontSize: 32 }}>{alunos.length}</h2>
-          </div>
-          <div style={cardStyle}>
-            <strong style={{ color: COLORS.muted }}>Alunos ativos</strong>
-            <h2 style={{ color: COLORS.blue, fontSize: 32 }}>{activeAlunos.length}</h2>
-          </div>
-          {alunosPorProfessor.map((grupo) => (
-            <div key={grupo.professorId} style={cardStyle}>
-              <strong style={{ color: COLORS.muted }}>{grupo.professorNome}</strong>
-              <h2 style={{ color: COLORS.blue, fontSize: 32 }}>{grupo.alunos.length}</h2>
-            </div>
-          ))}
+        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
+          {metricCard('Total de alunos', alunos.length)}
+          {metricCard('Alunos ativos', alunosAtivosLocal.length)}
+          {metricCard('1x por semana', countPlan(alunosAtivosLocal, '1x'), 'planos ativos')}
+          {metricCard('2x por semana', countPlan(alunosAtivosLocal, '2x'), 'planos ativos')}
+          {metricCard('Personalizados', countPlan(alunosAtivosLocal, 'personalizado'), 'planos ativos')}
+          {metricCard('Sem plano/valor', countPlan(alunosAtivosLocal, 'sem-plano'), 'revisar cadastro')}
         </div>
 
         <div style={cardStyle}>
-          <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Alunos cadastrados por professor</h2>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 12 }}>
+            <div>
+              <h2 style={{ color: COLORS.blue, margin: 0 }}>Alunos por professor</h2>
+              <p style={{ color: COLORS.muted, margin: '6px 0 0' }}>
+                Cada bloco funciona como uma pasta. Abra o professor e veja os alunos vinculados.
+              </p>
+            </div>
+          </div>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Nome</th>
-                  <th style={thStyle}>Telefone</th>
-                  <th style={thStyle}>Professor</th>
-                  <th style={thStyle}>Plano</th>
-                  <th style={thStyle}>Valor</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {alunosPorProfessor.map((grupo) => (
-                  <>
-                    <tr key={`${grupo.professorId}-header`}>
-                      <td colSpan={7} style={{ ...tdStyle, background: COLORS.blueSoft, color: COLORS.blue, fontWeight: 900 }}>
-                        {grupo.professorNome} — {grupo.alunos.length} aluno(s)
-                      </td>
-                    </tr>
+          <div style={{ display: 'grid', gap: 14 }}>
+            {alunosPorProfessor.map((grupo) => {
+              const ativosGrupo = grupo.alunos.filter((aluno) => aluno.status !== 'inativo');
+              const receitaGrupo = ativosGrupo.reduce((sum, aluno) => sum + Number(aluno.plano_valor || 0), 0);
+
+              return (
+                <details key={grupo.professorId} open style={{ border: `1px solid ${COLORS.border}`, borderRadius: 22, background: '#fff', overflow: 'hidden' }}>
+                  <summary
+                    style={{
+                      cursor: 'pointer',
+                      listStyle: 'none',
+                      padding: 18,
+                      background: COLORS.blueSoft,
+                      display: 'grid',
+                      gap: 12,
+                      gridTemplateColumns: 'minmax(220px, 1.6fr) repeat(5, minmax(100px, 1fr))',
+                      alignItems: 'center',
+                    }}
+                  >
+                    <div>
+                      <strong style={{ color: COLORS.blue, fontSize: 18 }}>📁 {grupo.professorNome}</strong>
+                      <div style={{ color: COLORS.muted, fontSize: 12, marginTop: 4 }}>Clique para abrir/fechar a pasta</div>
+                    </div>
+                    <div><strong>{grupo.alunos.length}</strong><br /><span style={{ color: COLORS.muted, fontSize: 12 }}>total</span></div>
+                    <div><strong>{ativosGrupo.length}</strong><br /><span style={{ color: COLORS.muted, fontSize: 12 }}>ativos</span></div>
+                    <div><strong>{countPlan(ativosGrupo, '1x')}</strong><br /><span style={{ color: COLORS.muted, fontSize: 12 }}>1x semana</span></div>
+                    <div><strong>{countPlan(ativosGrupo, '2x')}</strong><br /><span style={{ color: COLORS.muted, fontSize: 12 }}>2x semana</span></div>
+                    <div><strong>{formatMoney(receitaGrupo)}</strong><br /><span style={{ color: COLORS.muted, fontSize: 12 }}>previsto</span></div>
+                  </summary>
+
+                  <div style={{ padding: 14, display: 'grid', gap: 10 }}>
                     {grupo.alunos.map((aluno) => (
-                      <tr key={aluno.id}>
-                        <td style={tdStyle}>
+                      <div
+                        key={aluno.id}
+                        style={{
+                          border: `1px solid ${COLORS.border}`,
+                          borderRadius: 18,
+                          padding: 14,
+                          display: 'grid',
+                          gap: 12,
+                          gridTemplateColumns: 'minmax(220px, 1.5fr) minmax(130px, 0.8fr) minmax(160px, 1fr) minmax(110px, 0.7fr) minmax(240px, 1fr)',
+                          alignItems: 'center',
+                        }}
+                      >
+                        <div>
                           <button
-                            style={{ border: 'none', background: 'transparent', color: COLORS.blue, fontWeight: 900, cursor: 'pointer', padding: 0 }}
+                            style={{ border: 'none', background: 'transparent', color: COLORS.blue, fontWeight: 900, cursor: 'pointer', padding: 0, fontSize: 16, textAlign: 'left' }}
                             onClick={() => setSelectedAlunoId(aluno.id)}
                           >
                             {aluno.nome}
                           </button>
-                        </td>
-                        <td style={tdStyle}>{aluno.telefone || '-'}</td>
-                        <td style={tdStyle}>{getProfessorName(professores, aluno.professor_id)}</td>
-                        <td style={tdStyle}>{aluno.tipo_plano === 'personalizado' ? 'Personalizado' : aluno.plano_descricao || '-'}</td>
-                        <td style={tdStyle}>{formatMoney(aluno.plano_valor)}</td>
-                        <td style={tdStyle}>{aluno.status || 'ativo'}</td>
-                        <td style={tdStyle}>
-                          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                            <button style={secondaryButtonStyle()} onClick={() => setSelectedAlunoId(aluno.id)}>Ficha</button>
-                            <button
-                              style={secondaryButtonStyle()}
-                              onClick={() => {
-                                setEditingStudentId(aluno.id);
-                                setStudentForm({
-                                  nome: aluno.nome || '',
-                                  telefone: aluno.telefone || '',
-                                  email: aluno.email || '',
-                                  cpf: aluno.cpf || '',
-                                  data_nascimento: aluno.data_nascimento || '',
-                                  endereco: aluno.endereco || '',
-                                  cep: aluno.cep || '',
-                                  data_inicio: aluno.data_inicio || '',
-                                  status: aluno.status || 'ativo',
-                                  tipo_plano: aluno.tipo_plano || 'padrao',
-                                  plano_descricao: aluno.plano_descricao || '',
-                                  plano_valor: aluno.plano_valor ? String(aluno.plano_valor) : '',
-                                  professor_id: aluno.professor_id || '',
-                                  menor_idade: Boolean(aluno.menor_idade),
-                                  responsavel_nome: aluno.responsavel_nome || '',
-                                  responsavel_telefone: aluno.responsavel_telefone || '',
-                                  responsavel_email: aluno.responsavel_email || '',
-                                  responsavel_cpf: aluno.responsavel_cpf || '',
-                                  responsavel_endereco: aluno.responsavel_endereco || '',
-                                  responsavel_cep: aluno.responsavel_cep || '',
-                                });
-                              }}
-                            >
-                              Editar
-                            </button>
-                            <button style={secondaryButtonStyle()} onClick={() => deleteRecord('alunos', aluno.id)}>Excluir</button>
-                          </div>
-                        </td>
-                      </tr>
+                          <div style={{ color: COLORS.muted, fontSize: 12, marginTop: 4 }}>{aluno.telefone || 'Sem telefone'}</div>
+                        </div>
+
+                        <div>
+                          <span style={{ color: COLORS.muted, fontSize: 12 }}>Status</span>
+                          <div style={{ fontWeight: 800, color: aluno.status === 'inadimplente' ? COLORS.danger : COLORS.text }}>{aluno.status || 'ativo'}</div>
+                        </div>
+
+                        <div>
+                          <span style={{ color: COLORS.muted, fontSize: 12 }}>Plano</span>
+                          <div style={{ fontWeight: 800 }}>{aluno.tipo_plano === 'personalizado' ? 'Personalizado' : aluno.plano_descricao || '-'}</div>
+                        </div>
+
+                        <div>
+                          <span style={{ color: COLORS.muted, fontSize: 12 }}>Valor</span>
+                          <div style={{ fontWeight: 800 }}>{formatMoney(aluno.plano_valor)}</div>
+                        </div>
+
+                        {renderAlunoActions(aluno)}
+                      </div>
                     ))}
-                  </>
-                ))}
-              </tbody>
-            </table>
+
+                    {grupo.alunos.length === 0 ? (
+                      <div style={{ padding: 16, color: COLORS.muted }}>Nenhum aluno vinculado a este professor.</div>
+                    ) : null}
+                  </div>
+                </details>
+              );
+            })}
+
+            {alunosPorProfessor.length === 0 ? (
+              <div style={{ padding: 18, border: `1px solid ${COLORS.border}`, borderRadius: 18, color: COLORS.muted }}>
+                Nenhum aluno cadastrado.
+              </div>
+            ) : null}
           </div>
         </div>
       </section>
