@@ -1344,119 +1344,51 @@ export default function Home() {
   }
 
   function renderStudents() {
-    const alunosAtivosLocal = alunos.filter((aluno) => aluno.status !== 'inativo');
+    const alunosAtivosLista = alunos.filter((aluno) => aluno.status !== 'inativo');
+    const total1x = alunosAtivosLista.filter((aluno) => normalizeText(aluno.plano_descricao).includes('1x')).length;
+    const total2x = alunosAtivosLista.filter((aluno) => normalizeText(aluno.plano_descricao).includes('2x')).length;
+    const totalPersonalizado = alunosAtivosLista.filter((aluno) => aluno.tipo_plano === 'personalizado').length;
+    const totalSemPlano = alunosAtivosLista.filter((aluno) => !aluno.plano_valor || Number(aluno.plano_valor) <= 0).length;
 
-    const getPlanKind = (aluno: Aluno) => {
-      const plano = normalizeText(`${aluno.tipo_plano || ''} ${aluno.plano_descricao || ''}`);
-      if (plano.includes('personalizado')) return 'personalizado';
-      if (plano.includes('2x')) return '2x';
-      if (plano.includes('1x')) return '1x';
-      if (Number(aluno.plano_valor || 0) === 320 || Number(aluno.plano_valor || 0) === 215) return '2x';
-      if (Number(aluno.plano_valor || 0) === 220 || Number(aluno.plano_valor || 0) === 125) return '1x';
-      return 'sem-plano';
-    };
-
-    const countPlan = (lista: Aluno[], tipo: '1x' | '2x' | 'personalizado' | 'sem-plano') =>
-      lista.filter((aluno) => getPlanKind(aluno) === tipo).length;
-
-    const metricCard = (label: string, value: string | number, helper?: string) => (
-      <div
-        style={{
-          ...cardStyle,
-          padding: 18,
-          minHeight: 118,
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'space-between',
-        }}
-      >
-        <strong style={{ color: COLORS.muted, fontSize: 13 }}>{label}</strong>
-        <div style={{ color: COLORS.blue, fontSize: 34, fontWeight: 900, lineHeight: 1 }}>{value}</div>
-        {helper ? <span style={{ color: COLORS.muted, fontSize: 12 }}>{helper}</span> : <span />}
-      </div>
-    );
-
-    const renderAlunoActions = (aluno: Aluno) => (
-      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-        <button style={secondaryButtonStyle()} onClick={() => setSelectedAlunoId(aluno.id)}>
-          Ficha
-        </button>
-        <button
-          style={secondaryButtonStyle()}
-          onClick={() => {
-            setEditingStudentId(aluno.id);
-            setStudentForm({
-              nome: aluno.nome || '',
-              telefone: aluno.telefone || '',
-              email: aluno.email || '',
-              cpf: aluno.cpf || '',
-              data_nascimento: aluno.data_nascimento || '',
-              endereco: aluno.endereco || '',
-              cep: aluno.cep || '',
-              data_inicio: aluno.data_inicio || '',
-              status: aluno.status || 'ativo',
-              tipo_plano: aluno.tipo_plano || 'padrao',
-              plano_descricao: aluno.plano_descricao || '',
-              plano_valor: aluno.plano_valor ? String(aluno.plano_valor) : '',
-              professor_id: aluno.professor_id || '',
-              menor_idade: Boolean(aluno.menor_idade),
-              responsavel_nome: aluno.responsavel_nome || '',
-              responsavel_telefone: aluno.responsavel_telefone || '',
-              responsavel_email: aluno.responsavel_email || '',
-              responsavel_cpf: aluno.responsavel_cpf || '',
-              responsavel_endereco: aluno.responsavel_endereco || '',
-              responsavel_cep: aluno.responsavel_cep || '',
-            });
-            window.scrollTo({ top: 0, behavior: 'smooth' });
-          }}
-        >
-          Editar
-        </button>
-        <button style={secondaryButtonStyle()} onClick={() => deleteRecord('alunos', aluno.id)}>
-          Excluir
-        </button>
-      </div>
-    );
+    function compactMetric(label: string, value: string | number, detail?: string) {
+      return (
+        <div style={{ ...cardStyle, padding: 16, minHeight: 96 }}>
+          <strong style={{ color: COLORS.muted, fontSize: 13 }}>{label}</strong>
+          <div style={{ color: COLORS.blue, fontSize: 30, fontWeight: 900, marginTop: 8 }}>{value}</div>
+          {detail ? <div style={{ color: COLORS.muted, fontSize: 12, marginTop: 4 }}>{detail}</div> : null}
+        </div>
+      );
+    }
 
     return (
       <section style={{ display: 'grid', gap: 20 }}>
-        <div style={{ ...cardStyle, overflow: 'hidden' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 16 }}>
-            <div>
-              <h2 style={{ color: COLORS.blue, margin: 0 }}>Cadastro de alunos</h2>
-              <p style={{ color: COLORS.muted, margin: '6px 0 0' }}>
-                Cadastre alunos matriculados, defina professor, plano e dados do responsável quando for menor.
-              </p>
-            </div>
-            {editingStudentId ? (
-              <div style={{ padding: '8px 12px', borderRadius: 999, background: COLORS.blueSoft, color: COLORS.blue, fontWeight: 900 }}>
-                Editando aluno
-              </div>
-            ) : null}
-          </div>
+        <div style={cardStyle}>
+          <h2 style={{ color: COLORS.blue, marginTop: 0 }}>
+            {editingStudentId ? 'Editando aluno' : 'Cadastro de alunos'}
+          </h2>
 
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', alignItems: 'end' }}>
+          <div style={{ display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', alignItems: 'end' }}>
             <input style={inputStyle()} placeholder="Nome completo" value={studentForm.nome} onChange={(e) => setStudentForm({ ...studentForm, nome: e.target.value })} />
             <input style={inputStyle()} placeholder="Celular" value={studentForm.telefone} onChange={(e) => setStudentForm({ ...studentForm, telefone: maskPhone(e.target.value) })} />
             <input style={inputStyle()} placeholder="E-mail" value={studentForm.email} onChange={(e) => setStudentForm({ ...studentForm, email: e.target.value })} />
             <input style={inputStyle()} placeholder="CPF" value={studentForm.cpf} onChange={(e) => setStudentForm({ ...studentForm, cpf: maskCPF(e.target.value) })} />
 
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: COLORS.muted, marginBottom: 6 }}>Data de nascimento</label>
-              <input style={{ ...inputStyle(), width: '100%' }} type="date" value={studentForm.data_nascimento} onChange={(e) => setStudentForm({ ...studentForm, data_nascimento: e.target.value })} />
-            </div>
+            <label style={{ display: 'grid', gap: 6, color: COLORS.muted, fontWeight: 800, fontSize: 13 }}>
+              Data de nascimento
+              <input style={inputStyle()} type="date" value={studentForm.data_nascimento} onChange={(e) => setStudentForm({ ...studentForm, data_nascimento: e.target.value })} />
+            </label>
 
             <input style={inputStyle()} placeholder="Endereço" value={studentForm.endereco} onChange={(e) => setStudentForm({ ...studentForm, endereco: e.target.value })} />
             <input style={inputStyle()} placeholder="CEP" value={studentForm.cep} onChange={(e) => setStudentForm({ ...studentForm, cep: maskCEP(e.target.value) })} />
 
-            <div>
-              <label style={{ display: 'block', fontSize: 12, fontWeight: 800, color: COLORS.muted, marginBottom: 6 }}>Data de início no CT</label>
-              <input style={{ ...inputStyle(), width: '100%' }} type="date" value={studentForm.data_inicio} onChange={(e) => setStudentForm({ ...studentForm, data_inicio: e.target.value })} />
-            </div>
+            <label style={{ display: 'grid', gap: 6, color: COLORS.muted, fontWeight: 800, fontSize: 13 }}>
+              Data de início no CT
+              <input style={inputStyle()} type="date" value={studentForm.data_inicio} onChange={(e) => setStudentForm({ ...studentForm, data_inicio: e.target.value })} />
+            </label>
 
             <select style={inputStyle()} value={studentForm.professor_id} onChange={(e) => setStudentForm({ ...studentForm, professor_id: e.target.value })}>
               <option value="">Professor principal</option>
-              {professoresPorModalidade(modalityFromPlan(studentForm.plano_descricao)).map((prof) => (
+              {professoresAtivos.map((prof) => (
                 <option key={prof.id} value={prof.id}>{prof.nome}</option>
               ))}
             </select>
@@ -1506,13 +1438,13 @@ export default function Home() {
             </select>
           </div>
 
-          <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 16, fontWeight: 700 }}>
+          <label style={{ display: 'flex', gap: 8, alignItems: 'center', marginTop: 16, fontWeight: 800 }}>
             <input type="checkbox" checked={studentForm.menor_idade} onChange={(e) => setStudentForm({ ...studentForm, menor_idade: e.target.checked })} />
             Menor de idade
           </label>
 
           {studentForm.menor_idade && (
-            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', marginTop: 12, padding: 16, borderRadius: 18, background: COLORS.blueSoft }}>
+            <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', marginTop: 12, padding: 16, borderRadius: 18, background: COLORS.blueSoft }}>
               <input style={inputStyle()} placeholder="Nome do responsável" value={studentForm.responsavel_nome} onChange={(e) => setStudentForm({ ...studentForm, responsavel_nome: e.target.value })} />
               <input style={inputStyle()} placeholder="Celular do responsável" value={studentForm.responsavel_telefone} onChange={(e) => setStudentForm({ ...studentForm, responsavel_telefone: maskPhone(e.target.value) })} />
               <input style={inputStyle()} placeholder="E-mail do responsável" value={studentForm.responsavel_email} onChange={(e) => setStudentForm({ ...studentForm, responsavel_email: e.target.value })} />
@@ -1522,7 +1454,7 @@ export default function Home() {
             </div>
           )}
 
-          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 16 }}>
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginTop: 18 }}>
             <button onClick={saveStudent} style={primaryButtonStyle()}>
               {editingStudentId ? 'Salvar alterações do aluno' : 'Salvar aluno'}
             </button>
@@ -1541,110 +1473,103 @@ export default function Home() {
           </div>
         </div>
 
-        <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))' }}>
-          {metricCard('Total de alunos', alunos.length)}
-          {metricCard('Alunos ativos', alunosAtivosLocal.length)}
-          {metricCard('1x por semana', countPlan(alunosAtivosLocal, '1x'), 'planos ativos')}
-          {metricCard('2x por semana', countPlan(alunosAtivosLocal, '2x'), 'planos ativos')}
-          {metricCard('Personalizados', countPlan(alunosAtivosLocal, 'personalizado'), 'planos ativos')}
-          {metricCard('Sem plano/valor', countPlan(alunosAtivosLocal, 'sem-plano'), 'revisar cadastro')}
+        <div style={{ display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))' }}>
+          {compactMetric('Total de alunos', alunos.length, 'Todos os cadastros')}
+          {compactMetric('Alunos ativos', alunosAtivosLista.length, 'Aptos para aula')}
+          {compactMetric('Planos 1x semana', total1x)}
+          {compactMetric('Planos 2x semana', total2x)}
+          {compactMetric('Personalizados', totalPersonalizado)}
+          {compactMetric('Sem valor/plano', totalSemPlano)}
         </div>
 
         <div style={cardStyle}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start', flexWrap: 'wrap', marginBottom: 12 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'center', flexWrap: 'wrap', marginBottom: 16 }}>
             <div>
               <h2 style={{ color: COLORS.blue, margin: 0 }}>Alunos por professor</h2>
-              <p style={{ color: COLORS.muted, margin: '6px 0 0' }}>
-                Cada bloco funciona como uma pasta. Abra o professor e veja os alunos vinculados.
-              </p>
+              <p style={{ color: COLORS.muted, margin: '6px 0 0' }}>Organizado em pastas para facilitar a rotina da recepção.</p>
             </div>
+            <strong style={{ color: COLORS.blue }}>{alunosAtivosLista.length} ativo(s)</strong>
           </div>
 
           <div style={{ display: 'grid', gap: 14 }}>
             {alunosPorProfessor.map((grupo) => {
-              const ativosGrupo = grupo.alunos.filter((aluno) => aluno.status !== 'inativo');
-              const receitaGrupo = ativosGrupo.reduce((sum, aluno) => sum + Number(aluno.plano_valor || 0), 0);
+              const ativos = grupo.alunos.filter((aluno) => aluno.status !== 'inativo');
+              const grupo1x = ativos.filter((aluno) => normalizeText(aluno.plano_descricao).includes('1x')).length;
+              const grupo2x = ativos.filter((aluno) => normalizeText(aluno.plano_descricao).includes('2x')).length;
+              const personalizados = ativos.filter((aluno) => aluno.tipo_plano === 'personalizado').length;
+              const valorPrevisto = ativos.reduce((sum, aluno) => sum + Number(aluno.plano_valor || 0), 0);
 
               return (
-                <details key={grupo.professorId} open style={{ border: `1px solid ${COLORS.border}`, borderRadius: 22, background: '#fff', overflow: 'hidden' }}>
-                  <summary
-                    style={{
-                      cursor: 'pointer',
-                      listStyle: 'none',
-                      padding: 18,
-                      background: COLORS.blueSoft,
-                      display: 'grid',
-                      gap: 12,
-                      gridTemplateColumns: 'minmax(220px, 1.6fr) repeat(5, minmax(100px, 1fr))',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <strong style={{ color: COLORS.blue, fontSize: 18 }}>📁 {grupo.professorNome}</strong>
-                      <div style={{ color: COLORS.muted, fontSize: 12, marginTop: 4 }}>Clique para abrir/fechar a pasta</div>
+                <details key={grupo.professorId} open style={{ border: `1px solid ${COLORS.border}`, borderRadius: 20, overflow: 'hidden', background: '#fff' }}>
+                  <summary style={{ cursor: 'pointer', listStyle: 'none', padding: 18, background: COLORS.blueSoft }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <div>
+                        <strong style={{ color: COLORS.blue, fontSize: 20 }}>📁 {grupo.professorNome}</strong>
+                        <div style={{ color: COLORS.muted, marginTop: 6 }}>
+                          {ativos.length} ativo(s) • 1x: {grupo1x} • 2x: {grupo2x} • Personalizado: {personalizados}
+                        </div>
+                      </div>
+                      <div style={{ color: COLORS.blue, fontWeight: 900 }}>{formatMoney(valorPrevisto)}</div>
                     </div>
-                    <div><strong>{grupo.alunos.length}</strong><br /><span style={{ color: COLORS.muted, fontSize: 12 }}>total</span></div>
-                    <div><strong>{ativosGrupo.length}</strong><br /><span style={{ color: COLORS.muted, fontSize: 12 }}>ativos</span></div>
-                    <div><strong>{countPlan(ativosGrupo, '1x')}</strong><br /><span style={{ color: COLORS.muted, fontSize: 12 }}>1x semana</span></div>
-                    <div><strong>{countPlan(ativosGrupo, '2x')}</strong><br /><span style={{ color: COLORS.muted, fontSize: 12 }}>2x semana</span></div>
-                    <div><strong>{formatMoney(receitaGrupo)}</strong><br /><span style={{ color: COLORS.muted, fontSize: 12 }}>previsto</span></div>
                   </summary>
 
-                  <div style={{ padding: 14, display: 'grid', gap: 10 }}>
+                  <div style={{ display: 'grid', gap: 10, padding: 14 }}>
                     {grupo.alunos.map((aluno) => (
                       <div
                         key={aluno.id}
                         style={{
-                          border: `1px solid ${COLORS.border}`,
-                          borderRadius: 18,
-                          padding: 14,
                           display: 'grid',
+                          gridTemplateColumns: 'minmax(180px, 1.4fr) minmax(130px, 0.8fr) minmax(140px, 1fr) minmax(110px, 0.7fr) auto',
                           gap: 12,
-                          gridTemplateColumns: 'minmax(220px, 1.5fr) minmax(130px, 0.8fr) minmax(160px, 1fr) minmax(110px, 0.7fr) minmax(240px, 1fr)',
                           alignItems: 'center',
+                          padding: 14,
+                          border: `1px solid ${COLORS.border}`,
+                          borderRadius: 16,
+                          background: aluno.status === 'inadimplente' ? '#fff7ed' : '#fff',
                         }}
                       >
                         <div>
                           <button
-                            style={{ border: 'none', background: 'transparent', color: COLORS.blue, fontWeight: 900, cursor: 'pointer', padding: 0, fontSize: 16, textAlign: 'left' }}
                             onClick={() => setSelectedAlunoId(aluno.id)}
+                            style={{ border: 'none', background: 'transparent', padding: 0, color: COLORS.blue, fontWeight: 900, fontSize: 16, cursor: 'pointer', textAlign: 'left' }}
                           >
                             {aluno.nome}
                           </button>
-                          <div style={{ color: COLORS.muted, fontSize: 12, marginTop: 4 }}>{aluno.telefone || 'Sem telefone'}</div>
+                          <div style={{ color: COLORS.muted, fontSize: 13, marginTop: 4 }}>{aluno.telefone || 'Sem telefone'}</div>
                         </div>
 
-                        <div>
-                          <span style={{ color: COLORS.muted, fontSize: 12 }}>Status</span>
-                          <div style={{ fontWeight: 800, color: aluno.status === 'inadimplente' ? COLORS.danger : COLORS.text }}>{aluno.status || 'ativo'}</div>
-                        </div>
+                        <div style={{ color: COLORS.text, fontWeight: 700 }}>{aluno.plano_descricao || 'Sem plano'}</div>
+                        <div style={{ color: COLORS.text }}>{formatMoney(aluno.plano_valor)}</div>
+                        <div style={{ fontWeight: 900, color: aluno.status === 'inadimplente' ? COLORS.warning : COLORS.blue }}>{aluno.status || 'ativo'}</div>
 
-                        <div>
-                          <span style={{ color: COLORS.muted, fontSize: 12 }}>Plano</span>
-                          <div style={{ fontWeight: 800 }}>{aluno.tipo_plano === 'personalizado' ? 'Personalizado' : aluno.plano_descricao || '-'}</div>
+                        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
+                          <button style={secondaryButtonStyle()} onClick={() => setSelectedAlunoId(aluno.id)}>Ficha</button>
+                          <button
+                            style={secondaryButtonStyle()}
+                            onClick={() => {
+                              setEditingStudentId(aluno.id);
+                              setStudentForm({
+                                ...initialStudentForm,
+                                ...aluno,
+                                plano_valor: aluno.plano_valor ? String(aluno.plano_valor) : '',
+                                menor_idade: Boolean(aluno.menor_idade),
+                              });
+                              window.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                          >
+                            Editar
+                          </button>
+                          <button style={secondaryButtonStyle()} onClick={() => deleteRecord('alunos', aluno.id)}>Excluir</button>
                         </div>
-
-                        <div>
-                          <span style={{ color: COLORS.muted, fontSize: 12 }}>Valor</span>
-                          <div style={{ fontWeight: 800 }}>{formatMoney(aluno.plano_valor)}</div>
-                        </div>
-
-                        {renderAlunoActions(aluno)}
                       </div>
                     ))}
-
-                    {grupo.alunos.length === 0 ? (
-                      <div style={{ padding: 16, color: COLORS.muted }}>Nenhum aluno vinculado a este professor.</div>
-                    ) : null}
                   </div>
                 </details>
               );
             })}
 
             {alunosPorProfessor.length === 0 ? (
-              <div style={{ padding: 18, border: `1px solid ${COLORS.border}`, borderRadius: 18, color: COLORS.muted }}>
-                Nenhum aluno cadastrado.
-              </div>
+              <p style={{ color: COLORS.muted }}>Nenhum aluno cadastrado.</p>
             ) : null}
           </div>
         </div>
@@ -2072,12 +1997,39 @@ export default function Home() {
   }
 
   function renderFinancial() {
+    const alunoSelecionado = alunos.find((aluno) => aluno.id === financialForm.aluno_id);
+    const professorSelecionado = professores.find((professor) => professor.id === financialForm.professor_id);
+
+    const financeiroPorProfessor = professoresAtivos
+      .map((professor) => {
+        const rows = financeiro
+          .filter((item) => item.professor_id === professor.id)
+          .sort((a, b) => getAlunoName(alunos, a.aluno_id).localeCompare(getAlunoName(alunos, b.aluno_id), 'pt-BR'));
+
+        const recebido = rows.filter((item) => item.recebido).reduce((sum, item) => sum + Number(item.valor || 0), 0);
+        const pendente = rows.filter((item) => !item.recebido).reduce((sum, item) => sum + Number(item.valor || 0), 0);
+        const rate = professorRate(professor.percentual);
+
+        return {
+          professor,
+          rows,
+          recebido,
+          pendente,
+          comissao: recebido * rate,
+          arena: recebido * (1 - rate),
+        };
+      })
+      .filter((grupo) => grupo.rows.length > 0);
+
     return (
       <section style={{ display: 'grid', gap: 20 }}>
         <div style={cardStyle}>
           <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Lançamento financeiro</h2>
+          <p style={{ color: COLORS.muted, marginTop: -8 }}>
+            Selecione o aluno primeiro. O sistema preenche professor, valor e plano automaticamente.
+          </p>
 
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(4, 1fr)' }}>
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', alignItems: 'end' }}>
             <select
               style={inputStyle()}
               value={financialForm.aluno_id}
@@ -2092,14 +2044,17 @@ export default function Home() {
                 });
               }}
             >
-              <option value="">Aluno</option>
-              {alunos.map((aluno) => (
-                <option key={aluno.id} value={aluno.id}>{aluno.nome}</option>
-              ))}
+              <option value="">1. Selecione o aluno</option>
+              {alunos
+                .slice()
+                .sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR'))
+                .map((aluno) => (
+                  <option key={aluno.id} value={aluno.id}>{aluno.nome}</option>
+                ))}
             </select>
 
             <select style={inputStyle()} value={financialForm.professor_id} onChange={(e) => setFinancialForm({ ...financialForm, professor_id: e.target.value })}>
-              <option value="">Professor</option>
+              <option value="">2. Professor vinculado</option>
               {professoresAtivos.map((prof) => (
                 <option key={prof.id} value={prof.id}>{prof.nome}</option>
               ))}
@@ -2121,11 +2076,39 @@ export default function Home() {
               <option value="atrasado">Atrasado</option>
             </select>
 
-            <label style={{ display: 'flex', gap: 8, alignItems: 'center', fontWeight: 700 }}>
-              <input type="checkbox" checked={financialForm.recebido} onChange={(e) => setFinancialForm({ ...financialForm, recebido: e.target.checked })} />
-              Recebido
+            <label
+              style={{
+                display: 'flex',
+                gap: 10,
+                alignItems: 'center',
+                fontWeight: 900,
+                height: 42,
+                borderRadius: 12,
+                border: `1px solid ${financialForm.recebido ? '#2e7d32' : COLORS.border}`,
+                padding: '0 12px',
+                background: financialForm.recebido ? '#f0fff4' : '#fff',
+                color: financialForm.recebido ? '#1f7a3a' : COLORS.text,
+              }}
+            >
+              <input
+                type="checkbox"
+                checked={financialForm.recebido}
+                onChange={(e) => setFinancialForm({ ...financialForm, recebido: e.target.checked, status: e.target.checked ? 'recebido' : 'pendente' })}
+              />
+              {financialForm.recebido ? 'Recebido' : 'Pendente'}
             </label>
           </div>
+
+          {alunoSelecionado ? (
+            <div style={{ marginTop: 14, padding: 16, borderRadius: 18, background: COLORS.blueSoft, display: 'grid', gap: 8 }}>
+              <strong style={{ color: COLORS.blue }}>Resumo do aluno selecionado</strong>
+              <div style={{ color: COLORS.text }}>
+                {alunoSelecionado.nome} • {professorSelecionado?.nome || 'Sem professor'} • {alunoSelecionado.plano_descricao || 'Sem plano'} • {formatMoney(alunoSelecionado.plano_valor)}
+              </div>
+              {!alunoSelecionado.professor_id ? <div style={{ color: COLORS.warning, fontWeight: 900 }}>Atenção: aluno sem professor vinculado.</div> : null}
+              {!alunoSelecionado.plano_valor ? <div style={{ color: COLORS.warning, fontWeight: 900 }}>Atenção: aluno sem valor de plano definido.</div> : null}
+            </div>
+          ) : null}
 
           <textarea style={{ ...textareaStyle(), width: '100%', marginTop: 12 }} placeholder="Observação" value={financialForm.observacao} onChange={(e) => setFinancialForm({ ...financialForm, observacao: e.target.value })} />
 
@@ -2151,60 +2134,75 @@ export default function Home() {
         <div style={{ display: 'grid', gap: 16, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
           <div style={cardStyle}>
             <h3 style={{ marginTop: 0, color: COLORS.blue }}>Total recebido</h3>
-            <p style={{ fontSize: 28, fontWeight: 800 }}>{formatMoney(financialSummary.totalRecebido)}</p>
+            <p style={{ fontSize: 28, fontWeight: 900 }}>{formatMoney(financialSummary.totalRecebido)}</p>
           </div>
 
           <div style={cardStyle}>
             <h3 style={{ marginTop: 0, color: COLORS.blue }}>Total pendente</h3>
-            <p style={{ fontSize: 28, fontWeight: 800 }}>{formatMoney(financialSummary.totalPendente)}</p>
+            <p style={{ fontSize: 28, fontWeight: 900 }}>{formatMoney(financialSummary.totalPendente)}</p>
           </div>
 
           <div style={cardStyle}>
             <h3 style={{ marginTop: 0, color: COLORS.blue }}>Comissão professores</h3>
-            <p style={{ fontSize: 28, fontWeight: 800 }}>{formatMoney(financialSummary.totalProfessores)}</p>
+            <p style={{ fontSize: 28, fontWeight: 900 }}>{formatMoney(financialSummary.totalProfessores)}</p>
           </div>
 
           <div style={cardStyle}>
             <h3 style={{ marginTop: 0, color: COLORS.blue }}>Parte da arena</h3>
-            <p style={{ fontSize: 28, fontWeight: 800 }}>{formatMoney(financialSummary.totalArena)}</p>
+            <p style={{ fontSize: 28, fontWeight: 900 }}>{formatMoney(financialSummary.totalArena)}</p>
           </div>
         </div>
 
         <div style={cardStyle}>
-          <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Financeiro</h2>
+          <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Financeiro por professor</h2>
+          <p style={{ color: COLORS.muted, marginTop: -8 }}>
+            Cada pasta mostra alunos em ordem alfabética, recebido, pendente, comissão do professor e parte da arena.
+          </p>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Mês</th>
-                  <th style={thStyle}>Aluno</th>
-                  <th style={thStyle}>Professor</th>
-                  <th style={thStyle}>Valor</th>
-                  <th style={thStyle}>Vencimento</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Forma</th>
-                  <th style={thStyle}>Ação</th>
-                </tr>
-              </thead>
+          <div style={{ display: 'grid', gap: 14 }}>
+            {financeiroPorProfessor.map((grupo) => (
+              <details key={grupo.professor.id} open style={{ border: `1px solid ${COLORS.border}`, borderRadius: 20, overflow: 'hidden', background: '#fff' }}>
+                <summary style={{ cursor: 'pointer', listStyle: 'none', padding: 18, background: COLORS.blueSoft }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                    <div>
+                      <strong style={{ color: COLORS.blue, fontSize: 20 }}>📁 {grupo.professor.nome}</strong>
+                      <div style={{ color: COLORS.muted, marginTop: 6 }}>
+                        {grupo.rows.length} lançamento(s) • Recebido: {formatMoney(grupo.recebido)} • Pendente: {formatMoney(grupo.pendente)}
+                      </div>
+                    </div>
+                    <div style={{ color: COLORS.blue, fontWeight: 900 }}>
+                      Comissão: {formatMoney(grupo.comissao)} • Arena: {formatMoney(grupo.arena)}
+                    </div>
+                  </div>
+                </summary>
 
-              <tbody>
-                {financeiro.map((item) => (
-                  <tr
-                    key={item.id}
-                    style={{
-                      background: item.recebido ? '#f0fff4' : item.status === 'atrasado' ? '#fff5f5' : '#fffdf0',
-                    }}
-                  >
-                    <td style={tdStyle}>{item.mes || '-'}</td>
-                    <td style={tdStyle}>{getAlunoName(alunos, item.aluno_id)}</td>
-                    <td style={tdStyle}>{getProfessorName(professores, item.professor_id)}</td>
-                    <td style={tdStyle}>{formatMoney(item.valor)}</td>
-                    <td style={tdStyle}>{item.vencimento || '-'}</td>
-                    <td style={{ ...tdStyle, color: item.recebido ? '#1f7a3a' : item.status === 'atrasado' ? COLORS.danger : COLORS.warning, fontWeight: 900 }}>{item.recebido ? 'Recebido' : item.status || 'Pendente'}</td>
-                    <td style={tdStyle}>{item.forma_pagamento || '-'}</td>
-                    <td style={tdStyle}>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ display: 'grid', gap: 10, padding: 14 }}>
+                  {grupo.rows.map((item) => (
+                    <div
+                      key={item.id}
+                      style={{
+                        display: 'grid',
+                        gridTemplateColumns: 'minmax(180px, 1.2fr) minmax(100px, 0.6fr) minmax(120px, 0.8fr) minmax(120px, 0.7fr) auto',
+                        gap: 12,
+                        alignItems: 'center',
+                        padding: 14,
+                        border: `1px solid ${COLORS.border}`,
+                        borderRadius: 16,
+                        background: item.recebido ? '#f0fff4' : item.status === 'atrasado' ? '#fff5f5' : '#fffdf0',
+                      }}
+                    >
+                      <div>
+                        <strong style={{ color: COLORS.blue }}>{getAlunoName(alunos, item.aluno_id)}</strong>
+                        <div style={{ color: COLORS.muted, fontSize: 13, marginTop: 4 }}>{item.mes || '-'} • Venc.: {item.vencimento || '-'}</div>
+                      </div>
+
+                      <div style={{ fontWeight: 900 }}>{formatMoney(item.valor)}</div>
+                      <div style={{ fontWeight: 900, color: item.recebido ? '#1f7a3a' : item.status === 'atrasado' ? COLORS.danger : COLORS.warning }}>
+                        {item.recebido ? 'Recebido' : item.status || 'Pendente'}
+                      </div>
+                      <div>{item.forma_pagamento || '-'}</div>
+
+                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', justifyContent: 'flex-end' }}>
                         <button
                           style={secondaryButtonStyle()}
                           onClick={() => {
@@ -2220,6 +2218,7 @@ export default function Home() {
                               status: item.status || 'pendente',
                               observacao: item.observacao || '',
                             });
+                            window.scrollTo({ top: 0, behavior: 'smooth' });
                           }}
                         >
                           Editar
@@ -2229,11 +2228,15 @@ export default function Home() {
                         </button>
                         <button style={secondaryButtonStyle()} onClick={() => deleteRecord('financeiro', item.id)}>Excluir</button>
                       </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                    </div>
+                  ))}
+                </div>
+              </details>
+            ))}
+
+            {financeiroPorProfessor.length === 0 ? (
+              <p style={{ color: COLORS.muted }}>Nenhum lançamento financeiro cadastrado.</p>
+            ) : null}
           </div>
         </div>
       </section>
