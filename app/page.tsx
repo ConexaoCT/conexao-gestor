@@ -1517,7 +1517,7 @@ export default function Home() {
               const valorPrevisto = ativos.reduce((sum, aluno) => sum + Number(aluno.plano_valor || 0), 0);
 
               return (
-                <details key={grupo.professorId} open style={{ border: `1px solid ${COLORS.border}`, borderRadius: 20, overflow: 'hidden', background: '#fff' }}>
+                <details key={grupo.professorId} style={{ border: `1px solid ${COLORS.border}`, borderRadius: 20, overflow: 'hidden', background: '#fff' }}>
                   <summary style={{ cursor: 'pointer', listStyle: 'none', padding: 18, background: COLORS.blueSoft }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
                       <div>
@@ -2709,6 +2709,8 @@ export default function Home() {
           {toast.message}
         </div>
       ) : null}
+
+      {renderStudentDetailsModal()}
 
       {confirmBox ? (
         <div
