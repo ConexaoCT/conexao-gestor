@@ -72,6 +72,7 @@ type Experimental = {
   status_lead: string | null;
   follow_up: string | null;
   observacoes: string | null;
+  created_at?: string;
 };
 
 type Turma = {
