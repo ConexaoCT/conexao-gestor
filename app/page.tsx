@@ -844,6 +844,23 @@ export default function Home() {
       return;
     }
 
+    const aluno = alunos.find((item) => item.id === matriculaAlunoId);
+    const turma = turmas.find((item) => item.id === matriculaTurmaId);
+
+    if (!aluno || !turma) {
+      notify('Aluno ou turma não encontrado.', 'error');
+      return;
+    }
+
+    const jaMatriculado = matriculas.some(
+      (item) => item.aluno_id === matriculaAlunoId && item.turma_id === matriculaTurmaId && item.ativa !== false
+    );
+
+    if (jaMatriculado) {
+      notify('Esse aluno já está matriculado nessa turma.', 'error');
+      return;
+    }
+
     const { error } = await supabase.from('matriculas').insert({
       aluno_id: matriculaAlunoId,
       turma_id: matriculaTurmaId,
@@ -859,7 +876,7 @@ export default function Home() {
     setMatriculaAlunoId('');
     setMatriculaTurmaId('');
     await loadAllData();
-    notify('Aluno vinculado à turma com sucesso.', 'success');
+    notify(`${aluno.nome} vinculado à turma ${turma.nome || 'selecionada'}.`, 'success');
   }
 
   async function saveFinancial() {
@@ -1833,65 +1850,62 @@ export default function Home() {
 
         <div style={cardStyle}>
           <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Turmas cadastradas</h2>
+          <p style={{ color: COLORS.muted, marginTop: -8 }}>Visual em cards para facilitar conferência por professor, dia, horário e quadra.</p>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Turma</th>
-                  <th style={thStyle}>Modalidade</th>
-                  <th style={thStyle}>Categoria</th>
-                  <th style={thStyle}>Professor</th>
-                  <th style={thStyle}>Dia</th>
-                  <th style={thStyle}>Horário</th>
-                  <th style={thStyle}>Capacidade</th>
-                  <th style={thStyle}>Ação</th>
-                </tr>
-              </thead>
+          <div style={{ display: 'grid', gap: 14, gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))' }}>
+            {turmas.map((turma) => {
+              const matriculasTurma = matriculas.filter((item) => item.turma_id === turma.id && item.ativa !== false);
+              const ocupacao = `${matriculasTurma.length}/${turma.capacidade || '-'}`;
 
-              <tbody>
-                {turmas.map((turma) => (
-                  <tr key={turma.id}>
-                    <td style={tdStyle}>{turma.nome || '-'}</td>
-                    <td style={tdStyle}>{turma.modalidade || '-'}</td>
-                    <td style={tdStyle}>{turma.categoria || '-'}</td>
-                    <td style={tdStyle}>{getProfessorName(professores, turma.professor_id)}</td>
-                    <td style={tdStyle}>{turma.dia_semana || '-'}</td>
-                    <td style={tdStyle}>{turma.horario || '-'}</td>
-                    <td style={tdStyle}>{turma.capacidade || '-'}</td>
-                    <td style={tdStyle}>
-                      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                        <button
-                          style={secondaryButtonStyle()}
-                          onClick={() => {
-                            setEditingTurmaId(turma.id);
-                            setTurmaForm({
-                              nome: turma.nome || '',
-                              modalidade: turma.modalidade || 'Beach Tennis',
-                              categoria: turma.categoria || '',
-                              professor_id: turma.professor_id || '',
-                              dia_semana: turma.dia_semana || '',
-                              horario: turma.horario || '',
-                              quadra: turma.quadra || '',
-                              capacidade: turma.capacidade ? String(turma.capacidade) : '4',
-                            });
-                          }}
-                        >
-                          Editar
-                        </button>
-                        <button style={secondaryButtonStyle()} onClick={() => deleteRecord('turmas', turma.id)}>Excluir</button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+              return (
+                <div key={turma.id} style={{ border: `1px solid ${COLORS.border}`, borderRadius: 20, padding: 16, background: '#fff' }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', gap: 12, alignItems: 'flex-start' }}>
+                    <div>
+                      <h3 style={{ color: COLORS.blue, margin: 0 }}>{turma.nome || 'Turma sem nome'}</h3>
+                      <p style={{ color: COLORS.muted, margin: '6px 0 0' }}>
+                        {turma.modalidade || '-'} • {turma.categoria || '-'}
+                      </p>
+                    </div>
+                    <strong style={{ color: COLORS.blue, background: COLORS.blueSoft, borderRadius: 999, padding: '6px 10px' }}>
+                      {ocupacao}
+                    </strong>
+                  </div>
 
-                {turmas.length === 0 && (
-                  <tr>
-                    <td style={tdStyle} colSpan={8}>Nenhuma turma cadastrada.</td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
+                  <div style={{ display: 'grid', gap: 8, marginTop: 14, color: COLORS.text }}>
+                    <div><strong>Professor:</strong> {getProfessorName(professores, turma.professor_id)}</div>
+                    <div><strong>Dia/Horário:</strong> {turma.dia_semana || '-'} às {turma.horario || '-'}</div>
+                    <div><strong>Quadra:</strong> {turma.quadra || '-'}</div>
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 16 }}>
+                    <button
+                      style={secondaryButtonStyle()}
+                      onClick={() => {
+                        setEditingTurmaId(turma.id);
+                        setTurmaForm({
+                          nome: turma.nome || '',
+                          modalidade: turma.modalidade || 'Beach Tennis',
+                          categoria: turma.categoria || '',
+                          professor_id: turma.professor_id || '',
+                          dia_semana: turma.dia_semana || '',
+                          horario: turma.horario || '',
+                          quadra: turma.quadra || '',
+                          capacidade: turma.capacidade ? String(turma.capacidade) : '4',
+                        });
+                        window.scrollTo({ top: 0, behavior: 'smooth' });
+                      }}
+                    >
+                      Editar
+                    </button>
+                    <button style={secondaryButtonStyle()} onClick={() => deleteRecord('turmas', turma.id)}>Excluir</button>
+                  </div>
+                </div>
+              );
+            })}
+
+            {turmas.length === 0 ? (
+              <p style={{ color: COLORS.muted }}>Nenhuma turma cadastrada.</p>
+            ) : null}
           </div>
         </div>
       </section>
@@ -1899,24 +1913,46 @@ export default function Home() {
   }
 
   function renderEnrollments() {
+    const alunoSelecionado = alunos.find((item) => item.id === matriculaAlunoId);
+    const turmaSelecionada = turmas.find((item) => item.id === matriculaTurmaId);
+
+    const turmasCompativeis = turmas.filter((turma) => {
+      if (!alunoSelecionado) return true;
+
+      const alunoModalidade = modalityFromPlan(alunoSelecionado.plano_descricao);
+      const turmaModalidade = turma.modalidade || '';
+
+      const modalidadeOk =
+        !alunoModalidade ||
+        normalizeText(turmaModalidade).includes(normalizeText(alunoModalidade).split(' ')[0]) ||
+        normalizeText(alunoModalidade).includes(normalizeText(turmaModalidade).split(' ')[0]);
+
+      const professorOk = !alunoSelecionado.professor_id || !turma.professor_id || turma.professor_id === alunoSelecionado.professor_id;
+
+      return modalidadeOk && professorOk;
+    });
+
+    const matriculasAtivas = matriculas.filter((item) => item.ativa !== false);
+
     return (
       <section style={{ display: 'grid', gap: 20 }}>
         <div style={cardStyle}>
           <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Vincular aluno à turma</h2>
+          <p style={{ color: COLORS.muted, marginTop: -8 }}>Selecione o aluno primeiro. O sistema mostra dados do aluno e prioriza turmas compatíveis.</p>
 
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: '1fr 1fr auto' }}>
-            <select style={inputStyle()} value={matriculaAlunoId} onChange={(e) => setMatriculaAlunoId(e.target.value)}>
-              <option value="">Selecione o aluno</option>
-              {alunos.map((aluno) => (
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', alignItems: 'end' }}>
+            <select style={inputStyle()} value={matriculaAlunoId} onChange={(e) => { setMatriculaAlunoId(e.target.value); setMatriculaTurmaId(''); }}>
+              <option value="">1. Selecione o aluno</option>
+              {alunos.slice().sort((a, b) => a.nome.localeCompare(b.nome, 'pt-BR')).map((aluno) => (
                 <option key={aluno.id} value={aluno.id}>{aluno.nome}</option>
               ))}
             </select>
 
             <select style={inputStyle()} value={matriculaTurmaId} onChange={(e) => setMatriculaTurmaId(e.target.value)}>
-              <option value="">Selecione a turma</option>
-              {turmas.map((turma) => (
+              <option value="">2. Selecione a turma</option>
+              {turmasCompativeis.map((turma) => (
                 <option key={turma.id} value={turma.id}>
-                  {turma.nome} • {turma.dia_semana} {turma.horario}
+                  {turma.nome} • {turma.dia_semana} {turma.horario} • {getProfessorName(professores, turma.professor_id)}
                 </option>
               ))}
             </select>
@@ -1925,36 +1961,66 @@ export default function Home() {
               Vincular
             </button>
           </div>
+
+          {alunoSelecionado ? (
+            <div style={{ marginTop: 14, padding: 16, borderRadius: 18, background: COLORS.blueSoft, display: 'grid', gap: 8 }}>
+              <strong style={{ color: COLORS.blue }}>Resumo antes de vincular</strong>
+              <div>
+                <strong>{alunoSelecionado.nome}</strong> • {getProfessorName(professores, alunoSelecionado.professor_id)} • {alunoSelecionado.plano_descricao || 'Sem plano'} • {formatMoney(alunoSelecionado.plano_valor)}
+              </div>
+              {turmaSelecionada ? (
+                <div style={{ color: COLORS.muted }}>
+                  Turma escolhida: {turmaSelecionada.nome} • {turmaSelecionada.dia_semana} {turmaSelecionada.horario} • {turmaSelecionada.quadra || 'sem quadra'}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
 
         <div style={cardStyle}>
-          <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Matrículas</h2>
+          <h2 style={{ color: COLORS.blue, marginTop: 0 }}>Matrículas por turma</h2>
+          <p style={{ color: COLORS.muted, marginTop: -8 }}>Organização por turma para conferência rápida da recepção.</p>
 
-          <div style={{ overflowX: 'auto' }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={thStyle}>Aluno</th>
-                  <th style={thStyle}>Turma</th>
-                  <th style={thStyle}>Tipo</th>
-                  <th style={thStyle}>Status</th>
-                  <th style={thStyle}>Ação</th>
-                </tr>
-              </thead>
-              <tbody>
-                {matriculas.map((item) => (
-                  <tr key={item.id}>
-                    <td style={tdStyle}>{getAlunoName(alunos, item.aluno_id)}</td>
-                    <td style={tdStyle}>{getTurmaName(turmas, item.turma_id)}</td>
-                    <td style={tdStyle}>{item.tipo || 'fixo'}</td>
-                    <td style={tdStyle}>{item.ativa === false ? 'Inativa' : 'Ativa'}</td>
-                    <td style={tdStyle}>
-                      <button style={secondaryButtonStyle()} onClick={() => deleteRecord('matriculas', item.id)}>Excluir</button>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div style={{ display: 'grid', gap: 14 }}>
+            {turmas.map((turma) => {
+              const turmaMatriculas = matriculasAtivas.filter((item) => item.turma_id === turma.id);
+              const alunosTurma = turmaMatriculas
+                .map((item) => ({ matricula: item, aluno: alunos.find((aluno) => aluno.id === item.aluno_id) }))
+                .filter((item) => item.aluno)
+                .sort((a, b) => (a.aluno?.nome || '').localeCompare(b.aluno?.nome || '', 'pt-BR'));
+
+              return (
+                <details key={turma.id} open style={{ border: `1px solid ${COLORS.border}`, borderRadius: 20, overflow: 'hidden', background: '#fff' }}>
+                  <summary style={{ cursor: 'pointer', listStyle: 'none', padding: 18, background: COLORS.blueSoft }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
+                      <div>
+                        <strong style={{ color: COLORS.blue, fontSize: 20 }}>📁 {turma.nome || 'Turma'}</strong>
+                        <div style={{ color: COLORS.muted, marginTop: 6 }}>
+                          {turma.modalidade || '-'} • {turma.categoria || '-'} • {turma.dia_semana || '-'} {turma.horario || '-'}
+                        </div>
+                      </div>
+                      <strong style={{ color: COLORS.blue }}>{alunosTurma.length}/{turma.capacidade || '-'}</strong>
+                    </div>
+                  </summary>
+
+                  <div style={{ display: 'grid', gap: 10, padding: 14 }}>
+                    {alunosTurma.map(({ matricula, aluno }) => (
+                      <div key={matricula.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', alignItems: 'center', padding: 14, border: `1px solid ${COLORS.border}`, borderRadius: 16 }}>
+                        <div>
+                          <strong style={{ color: COLORS.blue }}>{aluno?.nome}</strong>
+                          <div style={{ color: COLORS.muted, fontSize: 13, marginTop: 4 }}>{aluno?.plano_descricao || 'Sem plano'} • {aluno?.telefone || 'Sem telefone'}</div>
+                        </div>
+                        <button style={secondaryButtonStyle()} onClick={() => deleteRecord('matriculas', matricula.id)}>Remover matrícula</button>
+                      </div>
+                    ))}
+
+                    {alunosTurma.length === 0 ? (
+                      <p style={{ color: COLORS.muted, margin: 0 }}>Nenhum aluno vinculado nesta turma.</p>
+                    ) : null}
+                  </div>
+                </details>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -2453,64 +2519,126 @@ export default function Home() {
     const aluno = alunos.find((item) => item.id === selectedAlunoId);
     if (!aluno) return null;
 
-    const alunoFinanceiro = financeiro.filter((item) => item.aluno_id === aluno.id);
-    const alunoMatriculas = matriculas.filter((item) => item.aluno_id === aluno.id);
-    const alunoPresencas = presencas.filter((item) => item.aluno_id === aluno.id);
+    const alunoFinanceiro = financeiro
+      .filter((item) => item.aluno_id === aluno.id)
+      .sort((a, b) => String(b.vencimento || '').localeCompare(String(a.vencimento || '')));
+    const alunoMatriculas = matriculas.filter((item) => item.aluno_id === aluno.id && item.ativa !== false);
+    const alunoPresencas = presencas
+      .filter((item) => item.aluno_id === aluno.id)
+      .sort((a, b) => String(b.data_aula || '').localeCompare(String(a.data_aula || '')));
+
+    const totalRecebidoAluno = alunoFinanceiro.filter((item) => item.recebido).reduce((sum, item) => sum + Number(item.valor || 0), 0);
+    const totalPendenteAluno = alunoFinanceiro.filter((item) => !item.recebido).reduce((sum, item) => sum + Number(item.valor || 0), 0);
+    const presencasPresentes = alunoPresencas.filter((item) => item.presente).length;
+    const faltas = alunoPresencas.filter((item) => !item.presente).length;
+    const frequencia = alunoPresencas.length > 0 ? Math.round((presencasPresentes / alunoPresencas.length) * 100) : 0;
 
     return (
       <div style={{ position: 'fixed', inset: 0, background: 'rgba(8, 12, 38, 0.45)', display: 'grid', placeItems: 'center', zIndex: 1000, padding: 20 }}>
-        <div style={{ ...cardStyle, width: 'min(900px, 96vw)', maxHeight: '88vh', overflowY: 'auto' }}>
-          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start' }}>
+        <div style={{ ...cardStyle, width: 'min(980px, 96vw)', maxHeight: '88vh', overflowY: 'auto' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <div>
-              <h2 style={{ color: COLORS.blue, marginTop: 0 }}>{aluno.nome}</h2>
-              <p style={{ color: COLORS.muted, marginTop: -8 }}>Ficha completa do aluno</p>
+              <span style={{ display: 'inline-block', padding: '6px 12px', borderRadius: 999, background: COLORS.blueSoft, color: COLORS.blue, fontWeight: 900 }}>
+                Ficha do aluno
+              </span>
+              <h2 style={{ color: COLORS.blue, margin: '10px 0 0', fontSize: 32 }}>{aluno.nome}</h2>
+              <p style={{ color: COLORS.muted, marginTop: 4 }}>
+                {getProfessorName(professores, aluno.professor_id)} • {aluno.plano_descricao || 'Sem plano'} • {formatMoney(aluno.plano_valor)}
+              </p>
             </div>
             <button style={secondaryButtonStyle()} onClick={() => setSelectedAlunoId(null)}>Fechar</button>
           </div>
 
-          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-            <p><strong>Telefone:</strong><br />{aluno.telefone || '-'}</p>
-            <p><strong>E-mail:</strong><br />{aluno.email || '-'}</p>
-            <p><strong>CPF:</strong><br />{aluno.cpf || '-'}</p>
-            <p><strong>Data de nascimento:</strong><br />{aluno.data_nascimento || '-'}</p>
-            <p><strong>Data de início no CT:</strong><br />{aluno.data_inicio || '-'}</p>
-            <p><strong>Professor:</strong><br />{getProfessorName(professores, aluno.professor_id)}</p>
-            <p><strong>Plano:</strong><br />{aluno.plano_descricao || '-'}</p>
-            <p><strong>Valor:</strong><br />{formatMoney(aluno.plano_valor)}</p>
-            <p><strong>Status:</strong><br />{aluno.status || 'ativo'}</p>
-            <p><strong>Origem matrícula:</strong><br />{aluno.origem_matricula || 'manual'}</p>
-            <p><strong>Contrato:</strong><br />{aluno.contrato_status || 'pendente'}</p>
-            <p><strong>Endereço:</strong><br />{aluno.endereco || '-'}</p>
-            <p><strong>CEP:</strong><br />{aluno.cep || '-'}</p>
+          <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', marginTop: 18 }}>
+            <div style={{ padding: 16, borderRadius: 16, background: COLORS.blueSoft }}>
+              <strong style={{ color: COLORS.muted }}>Status</strong>
+              <div style={{ color: COLORS.blue, fontSize: 22, fontWeight: 900, marginTop: 6 }}>{aluno.status || 'ativo'}</div>
+            </div>
+            <div style={{ padding: 16, borderRadius: 16, background: COLORS.blueSoft }}>
+              <strong style={{ color: COLORS.muted }}>Recebido</strong>
+              <div style={{ color: COLORS.blue, fontSize: 22, fontWeight: 900, marginTop: 6 }}>{formatMoney(totalRecebidoAluno)}</div>
+            </div>
+            <div style={{ padding: 16, borderRadius: 16, background: COLORS.blueSoft }}>
+              <strong style={{ color: COLORS.muted }}>Pendente</strong>
+              <div style={{ color: COLORS.blue, fontSize: 22, fontWeight: 900, marginTop: 6 }}>{formatMoney(totalPendenteAluno)}</div>
+            </div>
+            <div style={{ padding: 16, borderRadius: 16, background: COLORS.blueSoft }}>
+              <strong style={{ color: COLORS.muted }}>Frequência</strong>
+              <div style={{ color: COLORS.blue, fontSize: 22, fontWeight: 900, marginTop: 6 }}>{frequencia}%</div>
+            </div>
           </div>
 
-          {aluno.menor_idade ? (
-            <div style={{ marginTop: 16, padding: 16, borderRadius: 16, background: COLORS.blueSoft }}>
-              <h3 style={{ color: COLORS.blue, marginTop: 0 }}>Responsável</h3>
-              <div style={{ display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-                <p><strong>Nome:</strong><br />{aluno.responsavel_nome || '-'}</p>
-                <p><strong>Telefone:</strong><br />{aluno.responsavel_telefone || '-'}</p>
-                <p><strong>E-mail:</strong><br />{aluno.responsavel_email || '-'}</p>
-                <p><strong>CPF:</strong><br />{aluno.responsavel_cpf || '-'}</p>
-                <p><strong>Endereço:</strong><br />{aluno.responsavel_endereco || '-'}</p>
-                <p><strong>CEP:</strong><br />{aluno.responsavel_cep || '-'}</p>
+          <div style={{ display: 'grid', gap: 16, marginTop: 18 }}>
+            <details open style={{ border: `1px solid ${COLORS.border}`, borderRadius: 18, overflow: 'hidden' }}>
+              <summary style={{ cursor: 'pointer', padding: 16, background: COLORS.blueSoft, color: COLORS.blue, fontWeight: 900 }}>Dados cadastrais</summary>
+              <div style={{ padding: 16, display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                <p><strong>Telefone:</strong><br />{aluno.telefone || '-'}</p>
+                <p><strong>E-mail:</strong><br />{aluno.email || '-'}</p>
+                <p><strong>CPF:</strong><br />{aluno.cpf || '-'}</p>
+                <p><strong>Data de nascimento:</strong><br />{aluno.data_nascimento || '-'}</p>
+                <p><strong>Data de início no CT:</strong><br />{aluno.data_inicio || '-'}</p>
+                <p><strong>Endereço:</strong><br />{aluno.endereco || '-'}</p>
+                <p><strong>CEP:</strong><br />{aluno.cep || '-'}</p>
+                <p><strong>Origem matrícula:</strong><br />{aluno.origem_matricula || 'manual'}</p>
+                <p><strong>Contrato:</strong><br />{aluno.contrato_status || 'pendente'}</p>
+                {aluno.contrato_url ? <p><strong>Link do contrato:</strong><br />{aluno.contrato_url}</p> : null}
               </div>
-            </div>
-          ) : null}
+            </details>
 
-          <div style={{ marginTop: 16, display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
-            <div style={{ padding: 16, borderRadius: 16, border: `1px solid ${COLORS.border}` }}>
-              <strong>Turmas/Matrículas</strong>
-              <p style={{ color: COLORS.muted }}>{alunoMatriculas.map((item) => getTurmaName(turmas, item.turma_id)).join(' • ') || 'Nenhuma matrícula vinculada.'}</p>
-            </div>
-            <div style={{ padding: 16, borderRadius: 16, border: `1px solid ${COLORS.border}` }}>
-              <strong>Financeiro</strong>
-              <p style={{ color: COLORS.muted }}>{alunoFinanceiro.length} lançamento(s) • Recebido: {formatMoney(alunoFinanceiro.filter((item) => item.recebido).reduce((sum, item) => sum + Number(item.valor || 0), 0))}</p>
-            </div>
-            <div style={{ padding: 16, borderRadius: 16, border: `1px solid ${COLORS.border}` }}>
-              <strong>Presenças</strong>
-              <p style={{ color: COLORS.muted }}>{alunoPresencas.length} registro(s)</p>
-            </div>
+            {aluno.menor_idade ? (
+              <details open style={{ border: `1px solid ${COLORS.border}`, borderRadius: 18, overflow: 'hidden' }}>
+                <summary style={{ cursor: 'pointer', padding: 16, background: COLORS.blueSoft, color: COLORS.blue, fontWeight: 900 }}>Responsável</summary>
+                <div style={{ padding: 16, display: 'grid', gap: 12, gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))' }}>
+                  <p><strong>Nome:</strong><br />{aluno.responsavel_nome || '-'}</p>
+                  <p><strong>Telefone:</strong><br />{aluno.responsavel_telefone || '-'}</p>
+                  <p><strong>E-mail:</strong><br />{aluno.responsavel_email || '-'}</p>
+                  <p><strong>CPF:</strong><br />{aluno.responsavel_cpf || '-'}</p>
+                  <p><strong>Endereço:</strong><br />{aluno.responsavel_endereco || '-'}</p>
+                  <p><strong>CEP:</strong><br />{aluno.responsavel_cep || '-'}</p>
+                </div>
+              </details>
+            ) : null}
+
+            <details open style={{ border: `1px solid ${COLORS.border}`, borderRadius: 18, overflow: 'hidden' }}>
+              <summary style={{ cursor: 'pointer', padding: 16, background: COLORS.blueSoft, color: COLORS.blue, fontWeight: 900 }}>Turmas e matrículas</summary>
+              <div style={{ padding: 16, display: 'grid', gap: 10 }}>
+                {alunoMatriculas.map((item) => (
+                  <div key={item.id} style={{ padding: 12, borderRadius: 14, border: `1px solid ${COLORS.border}` }}>
+                    {getTurmaName(turmas, item.turma_id)} • {item.tipo || 'fixo'}
+                  </div>
+                ))}
+                {alunoMatriculas.length === 0 ? <p style={{ color: COLORS.muted }}>Nenhuma matrícula vinculada.</p> : null}
+              </div>
+            </details>
+
+            <details open style={{ border: `1px solid ${COLORS.border}`, borderRadius: 18, overflow: 'hidden' }}>
+              <summary style={{ cursor: 'pointer', padding: 16, background: COLORS.blueSoft, color: COLORS.blue, fontWeight: 900 }}>Histórico financeiro</summary>
+              <div style={{ padding: 16, display: 'grid', gap: 10 }}>
+                {alunoFinanceiro.map((item) => (
+                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: 12, borderRadius: 14, border: `1px solid ${COLORS.border}`, background: item.recebido ? '#f0fff4' : '#fffdf0' }}>
+                    <strong>{item.mes || '-'} • {formatMoney(item.valor)}</strong>
+                    <span style={{ color: item.recebido ? '#1f7a3a' : COLORS.warning, fontWeight: 900 }}>{item.recebido ? 'Recebido' : item.status || 'Pendente'}</span>
+                    <span>{item.forma_pagamento || '-'}</span>
+                  </div>
+                ))}
+                {alunoFinanceiro.length === 0 ? <p style={{ color: COLORS.muted }}>Nenhum lançamento financeiro.</p> : null}
+              </div>
+            </details>
+
+            <details open style={{ border: `1px solid ${COLORS.border}`, borderRadius: 18, overflow: 'hidden' }}>
+              <summary style={{ cursor: 'pointer', padding: 16, background: COLORS.blueSoft, color: COLORS.blue, fontWeight: 900 }}>Histórico de presença</summary>
+              <div style={{ padding: 16, display: 'grid', gap: 10 }}>
+                <div style={{ color: COLORS.muted }}>Presenças: {presencasPresentes} • Faltas: {faltas} • Frequência: {frequencia}%</div>
+                {alunoPresencas.slice(0, 12).map((item) => (
+                  <div key={item.id} style={{ display: 'flex', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', padding: 12, borderRadius: 14, border: `1px solid ${COLORS.border}` }}>
+                    <strong>{item.data_aula || '-'}</strong>
+                    <span>{getTurmaName(turmas, item.turma_id)}</span>
+                    <span style={{ fontWeight: 900, color: item.presente ? '#1f7a3a' : COLORS.danger }}>{item.presente ? 'Presente' : 'Falta'} • {item.tipo_presenca || 'normal'}</span>
+                  </div>
+                ))}
+                {alunoPresencas.length === 0 ? <p style={{ color: COLORS.muted }}>Nenhum registro de presença.</p> : null}
+              </div>
+            </details>
           </div>
         </div>
       </div>
