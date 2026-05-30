@@ -1990,7 +1990,7 @@ export default function Home() {
                 .sort((a, b) => (a.aluno?.nome || '').localeCompare(b.aluno?.nome || '', 'pt-BR'));
 
               return (
-                <details key={turma.id} open style={{ border: `1px solid ${COLORS.border}`, borderRadius: 20, overflow: 'hidden', background: '#fff' }}>
+                <details key={turma.id} style={{ border: `1px solid ${COLORS.border}`, borderRadius: 20, overflow: 'hidden', background: '#fff' }}>
                   <summary style={{ cursor: 'pointer', listStyle: 'none', padding: 18, background: COLORS.blueSoft }}>
                     <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
                       <div>
@@ -2227,7 +2227,7 @@ export default function Home() {
 
           <div style={{ display: 'grid', gap: 14 }}>
             {financeiroPorProfessor.map((grupo) => (
-              <details key={grupo.professor.id} open style={{ border: `1px solid ${COLORS.border}`, borderRadius: 20, overflow: 'hidden', background: '#fff' }}>
+              <details key={grupo.professor.id} style={{ border: `1px solid ${COLORS.border}`, borderRadius: 20, overflow: 'hidden', background: '#fff' }}>
                 <summary style={{ cursor: 'pointer', listStyle: 'none', padding: 18, background: COLORS.blueSoft }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', gap: 16, flexWrap: 'wrap', alignItems: 'center' }}>
                     <div>
@@ -2336,16 +2336,18 @@ export default function Home() {
             .filter(Boolean) as Aluno[];
 
           return (
-            <div key={turma.id} style={cardStyle}>
-              <h2 style={{ color: COLORS.blue, marginTop: 0 }}>
-                {turma.nome || 'Turma'} · {turma.dia_semana || '-'} {turma.horario || ''}
-              </h2>
+            <details key={turma.id} style={{ ...cardStyle, overflow: 'hidden' }}>
+              <summary style={{ cursor: 'pointer', listStyle: 'none' }}>
+                <h2 style={{ color: COLORS.blue, marginTop: 0 }}>
+                  📁 {turma.nome || 'Turma'} · {turma.dia_semana || '-'} {turma.horario || ''}
+                </h2>
 
-              <p style={{ color: COLORS.muted }}>
-                {turma.modalidade || '-'} • {turma.categoria || '-'} • {turma.quadra || 'Quadra não informada'}
-              </p>
+                <p style={{ color: COLORS.muted, marginBottom: 0 }}>
+                  {turma.modalidade || '-'} • {turma.categoria || '-'} • {turma.quadra || 'Quadra não informada'}
+                </p>
+              </summary>
 
-              <div style={{ display: 'grid', gap: 12 }}>
+              <div style={{ display: 'grid', gap: 12, marginTop: 16 }}>
                 {alunosDaTurma.map((aluno) => {
                   const presencaHoje = getTodayPresence(aluno.id, turma.id);
                   const tipoAtual = presencaHoje?.tipo_presenca || '';
@@ -2401,7 +2403,7 @@ export default function Home() {
                   <p style={{ color: COLORS.muted }}>Nenhum aluno vinculado a esta turma.</p>
                 )}
               </div>
-            </div>
+            </details>
           );
         })}
 
